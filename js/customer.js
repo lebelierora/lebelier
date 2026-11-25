@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js?v=20251125-17";
+import { db } from "./firebase-config.js?v=20251125-18";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,7 +7,7 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js?v=20251125-17";
+} from "./menu.js?v=20251125-18";
 
 const $ = id => document.getElementById(id);
 const screens = ["scr-home", "scr-seat", "scr-order", "scr-detail", "scr-checkout", "scr-dinein", "scr-done", "scr-status"];
@@ -141,7 +141,7 @@ function renderDetail() {
   const it = detail.item;
   let html = `
     <div class="card" style="padding:0;overflow:hidden;">
-      ${it.img ? `<img src="${esc(it.img)}" alt="${esc(it.name)}" style="width:100%;aspect-ratio:1/1;object-fit:contain;display:block;background:#f7f1e3;">` : ""}
+      ${it.img ? `<img src="${esc(it.img)}" alt="${esc(it.name)}" style="width:100%;aspect-ratio:1/1;object-fit:cover;display:block;">` : ""}
       <div style="padding:14px;">
         <div style="font-size:20px;font-weight:900;">${esc(it.name)}${it.seasonal ? ` <span class="season-badge">季節メニュー</span>` : ""}</div>
         ${descHtml(it)}
