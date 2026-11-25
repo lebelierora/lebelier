@@ -2,13 +2,13 @@
 // テスト段階の簡易保護として PIN ゲートを使う（本番前に Firebase Auth へ移行すること）。
 const KITCHEN_PIN = "2321"; // テスト用PIN（店の電話番号の下4桁）
 
-import { db } from "./firebase-config.js?v=20251125-6";
+import { db } from "./firebase-config.js?v=20251125-7";
 import {
   collection, onSnapshot, query, where, doc, updateDoc, setDoc, deleteDoc, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   todayKey, formatDateJP, lastSlot, toMin, toHHMM, occupiedTime, esc, yen, seatLabel,
-} from "./menu.js?v=20251125-6";
+} from "./menu.js?v=20251125-7";
 
 const $ = id => document.getElementById(id);
 

@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js?v=20251125-6";
+import { db } from "./firebase-config.js?v=20251125-7";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,7 +7,7 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js?v=20251125-6";
+} from "./menu.js?v=20251125-7";
 
 const $ = id => document.getElementById(id);
 const screens = ["scr-home", "scr-seat", "scr-order", "scr-detail", "scr-checkout", "scr-dinein", "scr-done", "scr-status"];
@@ -92,7 +92,7 @@ let detail = null; // {item, cut, pack, choice, toppings:Set, qty}
 function openDetail(id) {
   const item = menuById(id);
   detail = { item, cut: "nocut", pack: "paper",
-             choice: item.choice ? item.choice.options[0].label : null,
+             choice: null, // choice は未選択スタート。選ぶまでカートに入れられない
              toppings: new Set(), qty: 1 };
   renderDetail();
   show("scr-detail");
@@ -140,7 +140,7 @@ function renderDetail() {
     html += `<div class="opt-group"><div class="label">${esc(it.choice.label)}</div><div class="opt-row">` +
       it.choice.options.map(o => `
         <button data-choice="${esc(o.label)}" class="${detail.choice === o.label ? "active" : ""}">${esc(o.label)}${o.delta ? ` <span style="color:var(--red-dark);">+${yen(o.delta)}</span>` : ""}</button>`).join("") +
-      `</div></div>`;
+      `</div>${detail.choice ? "" : `<div class="opt-note">お選びください（必須）</div>`}</div>`;
   }
   if ((it.toppings || []).length) {
     html += `<div class="opt-group"><div class="label">トッピング・変更</div><div class="check-row">` +
@@ -156,7 +156,7 @@ function renderDetail() {
         <button id="qty-minus">−</button><div class="qty">${detail.qty}</div><button id="qty-plus">＋</button>
       </div>
     </div>
-    <button class="btn" id="add-cart">カートに入れる　${yen(detailUnit() * detail.qty)}</button>`;
+    <button class="btn" id="add-cart" ${it.choice && !detail.choice ? "disabled" : ""}>${it.choice && !detail.choice ? esc(it.choice.label) : `カートに入れる　${yen(detailUnit() * detail.qty)}`}</button>`;
   $("detail-body").innerHTML = html;
 
   if (hasCutPack(it)) {
@@ -174,6 +174,7 @@ function renderDetail() {
   $("qty-minus").addEventListener("click", () => { if (detail.qty > 1) detail.qty--; renderDetail(); });
   $("qty-plus").addEventListener("click", () => { if (detail.qty < MAX_QTY) detail.qty++; renderDetail(); });
   $("add-cart").addEventListener("click", () => {
+    if (it.choice && !detail.choice) return; // 念のため：未選択では追加しない
     cart.push({ itemId: it.id, qty: detail.qty, cut: hasCutPack(it) ? detail.cut : null,
                 pack: hasCutPack(it) && mode === "takeout" ? detail.pack : null,
                 choice: detail.choice, toppings: [...detail.toppings] });

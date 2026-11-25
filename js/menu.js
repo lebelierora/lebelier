@@ -1,5 +1,7 @@
 // るべりえ 注文サイト（テイクアウト／店内）- メニューデータと共通ユーティリティ
-// メニューは Airレジモバイルオーダー掲載メニューと同等（全87品・10カテゴリ）。
+// メニューは Airレジモバイルオーダー掲載メニューと同等（全86品・10カテゴリ）。
+// ※「るべりえミルクアイストッピング」は独立商品にせず、るべりえミルク／るべりえソーダの
+//   バニラアイストッピング（+100円）として選ぶ仕様（本人指示 2026-11-25）。
 // 品名・価格・トッピング・カテゴリ振り分けは menu-airregi-mapping-2026-11-25.md が正。
 // 説明文と写真は店内版診断マスターから、品名が一致する品のみ流用。
 
@@ -20,7 +22,8 @@ export const CATEGORIES = [
 // noBox: 箱を選べない商品（レモンバターシュガー）
 // seasonal: 季節メニュー（仮想カテゴリ）にも表示する商品
 // toppings: [{label, delta}] チェックボックス式。delta は1個あたりの加算額（円）。
-// choice: {label, options:[{label, delta}]} 単一選択（必須・初期値は先頭）。
+// choice: {label, options:[{label, delta}]} 単一選択（必須・未選択スタート）。
+//   詳細画面で選ぶまで「カートに入れる」は押せない。
 //   選択した choice のラベルは注文データに保存され、厨房・お客側の両方に表示される。
 export const MENU = [
   // ---- ホールピザ ----
@@ -94,10 +97,9 @@ export const MENU = [
   { id: "ice-coffee", cat: "drink", name: "アイスコーヒー", price: 450, desc: "冷たいコーヒー", toppings: [{ label: "バニラアイストッピング", delta: 100 }] },
   { id: "cafe-latte", cat: "drink", name: "カフェラテ", price: 450, desc: "ICE／HOT", choice: { label: "ホット／アイスをお選びください", options: [{ label: "ホット", delta: 0 }, { label: "アイス", delta: 0 }] }, toppings: [{ label: "バニラアイストッピング", delta: 100 }] },
   { id: "espresso-soda", cat: "drink", name: "エスプレッソソーダ", price: 450, desc: "エスプレッソのソーダ割り", toppings: [{ label: "バニラアイストッピング", delta: 100 }] },
-  { id: "ruberie-soda", cat: "drink", name: "るべりえソーダ", price: 400, desc: "シロップが選べるオリジナルソーダ", choice: { label: "味をお選びください", options: [{ label: "ピーチ", delta: 0 }, { label: "パッション", delta: 0 }, { label: "ライチ", delta: 0 }, { label: "マンゴー", delta: 0 }, { label: "ブラッドオレンジ", delta: 0 }, { label: "ブルーキュラソー", delta: 0 }, { label: "イチゴ", delta: 0 }, { label: "スイカ", delta: 0 }, { label: "邑楽町産ゆず", delta: 0 }, { label: "緑色じゃないメロン", delta: 0 }] }, toppings: [] },
+  { id: "ruberie-soda", cat: "drink", name: "るべりえソーダ", price: 400, desc: "シロップが選べるオリジナルソーダ", choice: { label: "味をお選びください", options: [{ label: "ピーチ", delta: 0 }, { label: "パッション", delta: 0 }, { label: "ライチ", delta: 0 }, { label: "マンゴー", delta: 0 }, { label: "ブラッドオレンジ", delta: 0 }, { label: "ブルーキュラソー", delta: 0 }, { label: "イチゴ", delta: 0 }, { label: "スイカ", delta: 0 }, { label: "邑楽町産ゆず", delta: 0 }, { label: "緑色じゃないメロン", delta: 0 }] }, toppings: [{ label: "バニラアイストッピング", delta: 100 }] },
   { id: "cream-soda", cat: "drink", name: "緑色じゃないクリームソーダ", price: 500, desc: "色が選べる、緑色じゃないクリームソーダ", choice: { label: "味をお選びください", options: [{ label: "ピーチ", delta: 0 }, { label: "パッション", delta: 0 }, { label: "ライチ", delta: 0 }, { label: "マンゴー", delta: 0 }, { label: "ブラッドオレンジ", delta: 0 }, { label: "ブルーキュラソー", delta: 0 }, { label: "イチゴ", delta: 0 }, { label: "スイカ", delta: 0 }, { label: "邑楽町産ゆず", delta: 0 }, { label: "緑色じゃないメロン", delta: 0 }] }, toppings: [] },
-  { id: "ruberie-milk", cat: "drink", name: "るべりえミルク", price: 450, desc: "シロップが選べるミルクドリンク", choice: { label: "味をお選びください", options: [{ label: "ピーチ", delta: 0 }, { label: "パッション", delta: 0 }, { label: "ライチ", delta: 0 }, { label: "マンゴー", delta: 0 }, { label: "ブラッドオレンジ", delta: 0 }, { label: "ブルーキュラソー", delta: 0 }, { label: "イチゴ", delta: 0 }, { label: "スイカ", delta: 0 }, { label: "邑楽町産ゆず", delta: 0 }, { label: "緑色じゃないメロン", delta: 0 }] }, toppings: [] },
-  { id: "ruberie-milk-ice", cat: "drink", name: "るべりえミルクアイストッピング", price: 550, desc: "", choice: { label: "味をお選びください", options: [{ label: "ピーチ", delta: 0 }, { label: "パッション", delta: 0 }, { label: "ライチ", delta: 0 }, { label: "マンゴー", delta: 0 }, { label: "ブラッドオレンジ", delta: 0 }, { label: "ブルーキュラソー", delta: 0 }, { label: "イチゴ", delta: 0 }, { label: "スイカ", delta: 0 }, { label: "邑楽町産ゆず", delta: 0 }, { label: "緑色じゃないメロン", delta: 0 }] }, toppings: [] },
+  { id: "ruberie-milk", cat: "drink", name: "るべりえミルク", price: 450, desc: "シロップが選べるミルクドリンク", choice: { label: "味をお選びください", options: [{ label: "ピーチ", delta: 0 }, { label: "パッション", delta: 0 }, { label: "ライチ", delta: 0 }, { label: "マンゴー", delta: 0 }, { label: "ブラッドオレンジ", delta: 0 }, { label: "ブルーキュラソー", delta: 0 }, { label: "イチゴ", delta: 0 }, { label: "スイカ", delta: 0 }, { label: "邑楽町産ゆず", delta: 0 }, { label: "緑色じゃないメロン", delta: 0 }] }, toppings: [{ label: "バニラアイストッピング", delta: 100 }] },
   { id: "cocoa", cat: "drink", name: "人生のように甘過ぎないココア", price: 450, desc: "甘さ控えめのココア", toppings: [] },
   { id: "zero-ichi", cat: "drink", name: "キリンゼロイチ ノンアルコールビール", price: 400, desc: "ノンアルコールビール", toppings: [] },
   { id: "peche-oolong", cat: "drink", name: "ペシェウーロン（桃味）", price: 400, desc: "烏龍茶＋ピーチシロップ", toppings: [{ label: "バニラアイストッピング", delta: 100 }] },
