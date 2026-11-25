@@ -1,0 +1,99 @@
+:root{
+  --red:#c0392b; --red-dark:#96281b; --ink:#2b2118; --paper:#fdf6ec; --card:#fffdf8;
+  --line:#e8d9c3; --muted:#8a7a68; --ok:#1e8449; --warn:#b03a2e;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;}
+body{font-family:"Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif;background:var(--paper);color:var(--ink);}
+button{font-family:inherit;cursor:pointer;}
+input,textarea,select{font-family:inherit;font-size:16px;}
+.test-badge{display:inline-block;background:#f39c12;color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:2px 10px;vertical-align:middle;}
+header.top{background:#3a2a1e;color:#fdf6ec;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+header.top h1{font-size:19px;margin:0;font-weight:800;}
+header.top .sub{font-size:12px;opacity:.85;width:100%;}
+main{max-width:720px;margin:0 auto;padding:14px 14px 120px;}
+.btn{display:block;width:100%;border:none;border-radius:14px;padding:16px;font-size:17px;font-weight:800;background:var(--red);color:#fff;}
+.btn:active{background:var(--red-dark);}
+.btn.ghost{background:#fff;color:var(--ink);border:2px solid var(--line);}
+.btn.small{width:auto;display:inline-block;padding:10px 18px;font-size:15px;}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+.card{background:var(--card);border:2px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px;}
+.note{font-size:13px;color:var(--muted);line-height:1.6;}
+.err{background:#fdedec;border:2px solid var(--warn);color:var(--warn);border-radius:12px;padding:12px;font-weight:700;line-height:1.6;}
+.hidden{display:none !important;}
+
+/* カテゴリタブ */
+.tabs{display:flex;gap:8px;overflow-x:auto;padding:4px 0 10px;}
+.tabs button{flex:0 0 auto;border:2px solid var(--line);background:#fff;border-radius:999px;padding:10px 16px;font-size:15px;font-weight:700;}
+.tabs button.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+
+/* 商品グリッド */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media (max-width:420px){.grid{grid-template-columns:1fr 1fr;gap:9px;}}
+.item{background:var(--card);border:2px solid var(--line);border-radius:16px;overflow:hidden;text-align:left;padding:0;width:100%;}
+.item img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#eee;}
+.item .body{padding:10px 12px 12px;}
+.item .name{font-weight:800;font-size:16px;line-height:1.35;}
+.item .desc{font-size:12px;color:var(--muted);line-height:1.5;margin-top:4px;min-height:3em;}
+.item .price{font-weight:800;font-size:17px;margin-top:6px;color:var(--red-dark);}
+
+/* 選択肢ボタン群 */
+.opt-group{margin:14px 0;}
+.opt-group .label{font-weight:800;margin-bottom:8px;}
+.opt-row{display:flex;gap:8px;flex-wrap:wrap;}
+.opt-row button{flex:1 1 40%;border:2px solid var(--line);background:#fff;border-radius:12px;padding:13px 8px;font-size:15px;font-weight:700;min-height:52px;}
+.opt-row button.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+.opt-row button:disabled{opacity:.4;text-decoration:line-through;}
+.opt-note{font-size:12px;color:var(--warn);font-weight:700;margin-top:6px;}
+.check-row{display:flex;flex-direction:column;gap:8px;}
+.check-row label{display:flex;justify-content:space-between;align-items:center;border:2px solid var(--line);background:#fff;border-radius:12px;padding:13px;font-size:15px;font-weight:700;}
+.check-row input{width:22px;height:22px;}
+
+/* 数量ステッパー */
+.stepper{display:flex;align-items:center;gap:14px;}
+.stepper button{width:52px;height:52px;border-radius:50%;border:2px solid var(--line);background:#fff;font-size:24px;font-weight:800;}
+.stepper .qty{font-size:22px;font-weight:800;min-width:2em;text-align:center;}
+
+/* 日付チップ */
+.date-chips{display:flex;flex-direction:column;gap:8px;}
+.date-chips button{width:100%;border:2px solid var(--line);background:#fff;border-radius:12px;padding:13px;font-size:16px;font-weight:700;text-align:left;}
+.date-chips button.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+.date-chips button:disabled{opacity:.45;}
+.date-chips .today-badge{font-size:11px;background:var(--red);color:#fff;border-radius:999px;padding:1px 8px;margin-left:8px;}
+
+/* 時刻スロット */
+.slot-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.slot-grid button{border:2px solid var(--line);background:#fff;border-radius:10px;padding:12px 0;font-size:16px;font-weight:700;}
+.slot-grid button.active{background:var(--red);color:#fff;border-color:var(--red);}
+
+/* フォーム */
+.field{margin:14px 0;}
+.field label{display:block;font-weight:800;margin-bottom:6px;}
+.field input,.field textarea{width:100%;border:2px solid var(--line);border-radius:12px;padding:13px;background:#fff;}
+.field textarea{min-height:64px;resize:vertical;}
+
+/* 下部カートバー */
+.cartbar{position:fixed;left:0;right:0;bottom:0;background:var(--ink);color:#fff;padding:12px 16px calc(12px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:12px;z-index:40;}
+.cartbar .info{flex:1;font-weight:800;font-size:16px;}
+.cartbar button{background:var(--red);color:#fff;border:none;border-radius:12px;padding:13px 20px;font-size:16px;font-weight:800;position:relative;}
+.cart-badge{position:absolute;top:-8px;right:-8px;background:#f39c12;color:#fff;border-radius:999px;min-width:26px;height:26px;line-height:26px;text-align:center;font-size:14px;font-weight:800;padding:0 6px;}
+.cart-badge.pop{animation:pop .3s ease;}
+@keyframes pop{50%{transform:scale(1.45);}}
+
+/* 通知帯（タップを遮らない） */
+.toast{position:fixed;left:16px;right:16px;bottom:calc(96px + env(safe-area-inset-bottom));background:var(--ink);color:#fff;border-radius:14px;padding:14px 16px;font-weight:800;text-align:center;z-index:50;pointer-events:none;opacity:0;transition:opacity .18s ease;box-shadow:0 6px 20px rgba(0,0,0,.25);}
+.toast.show{opacity:1;}
+
+/* カート行 */
+.cart-line{display:flex;gap:10px;align-items:flex-start;border-bottom:1px dashed var(--line);padding:10px 0;}
+.cart-line .grow{flex:1;}
+.cart-line .nm{font-weight:800;}
+.cart-line .custom{font-size:12px;color:var(--muted);line-height:1.5;}
+.cart-line .amt{font-weight:800;white-space:nowrap;}
+.mini-stepper{display:flex;align-items:center;gap:8px;}
+.mini-stepper button{width:36px;height:36px;border-radius:50%;border:2px solid var(--line);background:#fff;font-size:18px;font-weight:800;}
+.del-btn{background:none;border:none;color:var(--warn);font-weight:700;font-size:13px;}
+
+.status-chip{display:inline-block;border-radius:999px;padding:3px 12px;font-size:13px;font-weight:800;color:#fff;}
+.status-pending{background:#e67e22;} .status-confirmed{background:var(--ok);} .status-done{background:#7f8c8d;} .status-noshow{background:#555;}
+.big-time{font-size:34px;font-weight:900;line-height:1.2;}

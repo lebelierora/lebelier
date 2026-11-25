@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>るべりえ テイクアウト注文</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="top">
+  <h1>るべりえ テイクアウト注文</h1>
+  <span class="test-badge">テスト公開中</span>
+  <div class="sub">創作ピザとスイーツのお店 るべりえ（群馬県邑楽町）／お支払いは受け取り時にレジでお願いします（現金・PayPay・コハクペイ等）</div>
+</header>
+<main>
+  <!-- トップ -->
+  <section id="scr-home">
+    <button class="btn" id="go-order" style="margin-bottom:12px;">テイクアウト注文をする</button>
+    <button class="btn ghost" id="go-status">注文状況を見る</button>
+    <div class="card" style="margin-top:16px;">
+      <p class="note" style="margin:0;">
+        ご注文は「確認待ち」で送信され、お店が受付すると確定します。確定のご連絡はこのページの「注文状況を見る」でも確認できます。<br>
+        初めてのご注文の方、10点以上のご注文の方は、確認のお電話をすることがあります。<br>
+        お急ぎの方はお電話ください：<a href="tel:0276702321">0276-70-2321</a>
+      </p>
+    </div>
+  </section>
+
+  <!-- 注文（メニュー） -->
+  <section id="scr-order" class="hidden">
+    <div class="tabs" id="cat-tabs"></div>
+    <div class="grid" id="item-grid"></div>
+  </section>
+
+  <!-- 商品詳細 -->
+  <section id="scr-detail" class="hidden">
+    <button class="btn ghost small" id="detail-back">← メニューに戻る</button>
+    <div id="detail-body" style="margin-top:12px;"></div>
+  </section>
+
+  <!-- カート＆注文手続き -->
+  <section id="scr-checkout" class="hidden">
+    <button class="btn ghost small" id="checkout-back">← メニューに戻る</button>
+    <h2 style="margin:14px 0 6px;">カート</h2>
+    <div class="card" id="cart-list"></div>
+    <h2 style="margin:18px 0 6px;">受け取り日時</h2>
+    <div class="field">
+      <label>受け取り日</label>
+      <div class="date-chips" id="date-chips"></div>
+    </div>
+    <div class="field">
+      <label>受け取り時刻</label>
+      <p class="note" id="lead-note" style="margin:0 0 8px;"></p>
+      <div class="slot-grid" id="slot-grid"></div>
+      <p class="note" id="slot-empty" style="margin-top:8px;"></p>
+    </div>
+    <h2 style="margin:18px 0 6px;">お客様情報</h2>
+    <div class="field">
+      <label for="cust-name">お名前（必須）</label>
+      <input id="cust-name" type="text" autocomplete="name" placeholder="例：中村">
+    </div>
+    <div class="field">
+      <label for="cust-phone">電話番号（必須）</label>
+      <input id="cust-phone" type="tel" autocomplete="tel" placeholder="例：09012345678">
+    </div>
+    <div class="field">
+      <label for="cust-note">備考（任意）</label>
+      <textarea id="cust-note" placeholder="ご要望があればご記入ください"></textarea>
+    </div>
+    <div class="card">
+      <p class="note" style="margin:0;">
+        初めてのご注文の方、10点以上のご注文の方は、確認のお電話をすることがあります。<br>
+        お支払いは受け取り時にレジでお願いします（現金・PayPay・コハクペイ等）。<br>
+        送信時点では注文は確定していません。お店の受付後に確定します。
+      </p>
+    </div>
+    <div id="order-error"></div>
+    <button class="btn" id="submit-order" style="margin-top:12px;">この内容で注文を送信する</button>
+  </section>
+
+  <!-- 送信完了（ライブ更新） -->
+  <section id="scr-done" class="hidden">
+    <div id="done-body"></div>
+    <button class="btn ghost" id="done-home" style="margin-top:14px;">トップに戻る</button>
+  </section>
+
+  <!-- 注文状況 -->
+  <section id="scr-status" class="hidden">
+    <button class="btn ghost small" id="status-back">← トップに戻る</button>
+    <h2 style="margin:14px 0 6px;">注文状況を見る</h2>
+    <p class="note">受け取り日と、注文時に入力した電話番号で、ご注文の状況を確認できます。注文番号は不要です。</p>
+    <div class="field">
+      <label>受け取り日</label>
+      <div class="date-chips" id="status-date-chips"></div>
+    </div>
+    <div class="field">
+      <label for="status-phone">電話番号</label>
+      <input id="status-phone" type="tel" autocomplete="tel" placeholder="例：09012345678">
+    </div>
+    <button class="btn" id="status-search">状況を確認する</button>
+    <p class="note" style="margin-top:8px;">確認待ちの間は自動で更新しています。</p>
+    <div id="status-results" style="margin-top:14px;"></div>
+  </section>
+</main>
+
+<!-- 下部カートバー -->
+<div class="cartbar hidden" id="cartbar">
+  <div class="info" id="cartbar-info">カートは空です</div>
+  <button id="cartbar-btn">カートを見る<span class="cart-badge hidden" id="cart-badge">0</span></button>
+</div>
+
+<!-- 通知帯（タップを遮らない） -->
+<div class="toast" id="toast"></div>
+
+<script type="module" src="js/customer.js"></script>
+</body>
+</html>
