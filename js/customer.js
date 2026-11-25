@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js<<?v=20251125-33";
+import { db } from "./firebase-config.js<<?v=20251125-34";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,10 +7,10 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js<<?v=20251125-33";
+} from "./menu.js<<?v=20251125-34";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
-} from "./frozen-menu.js<<?v=20251125-33";
+} from "./frozen-menu.js<<?v=20251125-34";
 
 // 焼きピザ・冷凍ピザ両方のメニューから商品を引く
 const anyById = id => menuById(id) || frozenById(id);
@@ -91,7 +91,7 @@ function renderGrid() {
     .filter(m => !m.hidden && (mode === "dinein" || !m.dineInOnly)); // dineInOnly の商品は店内モードでのみ表示する／hidden の商品は常に出さない
   $("item-grid").innerHTML = items.map(m => `
     <button class="item" data-id="${m.id}">
-      ${effImg(m) ? `<img src="${esc(effImg(m))}" alt="${esc(m.name)}" loading="lazy"${m.poster ? ` style="object-fit:contain;background:#f6efe3;"` : ""}>` : `<div class="noimg">写真なし</div>`}
+      ${effImg(m) ? `<img src="${esc(effImg(m))}" alt="${esc(m.name)}" loading="lazy"${m.poster ? ` style="object-fit:contain;background:#f6efe3;"` : ""}>` : (m.img ? "" : `<div class="noimg">写真なし</div>`)}
       <div class="body">
         <div class="name">${esc(m.name)}${m.seasonal ? ` <span class="season-badge">季節</span>` : ""}</div>
         <!-- 一覧では説明文を表示しない（本人指示 2026-11-25：見づらいため。説明は詳細画面のみ） -->
@@ -103,7 +103,12 @@ function renderGrid() {
 }
 
 // 店内だけ写真・説明を差し替える商品用（例：生ビールは店内=ゴブレット／テイクアウト=プラカップ）
-function effImg(it) { return (mode === "dinein" && it.imgDineIn) ? it.imgDineIn : it.img; }
+const NO_PHOTO_DINEIN_CATS = new Set(CATEGORIES.filter(c => c.noPhotoDineIn).map(c => c.id));
+function effImg(it) {
+  if (mode === "dinein" && it.imgDineIn) return it.imgDineIn;
+  if (mode === "dinein" && NO_PHOTO_DINEIN_CATS.has(it.cat)) return ""; // 店内では写真自体を出さないカテゴリ
+  return it.img;
+}
 function effDesc(it) { return (mode === "dinein" && it.descDineIn) ? it.descDineIn : it.desc; }
 
 // ---------- 商品詳細 ----------

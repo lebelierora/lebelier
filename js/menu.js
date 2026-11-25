@@ -13,7 +13,7 @@ export const CATEGORIES = [
   { id: "sweetpizza", name: "スイーツピザ" },
   { id: "kids", name: "キッズメニュー" },
   { id: "side", name: "サイドメニュー" },
-  { id: "drink", name: "ソフトドリンク" },
+  { id: "drink", name: "ソフトドリンク", noPhotoDineIn: true }, // 店内では写真なし（プラカップ写真が店内のグラス提供と違う／ドリンク同士の見分けにも写真が効かないため。本人指示 2026-11-25）
   { id: "alcohol", name: "アルコール" },
   { id: "sweets", name: "スイーツ", dineInOnly: true }, // 定番スイーツはイートイン限定のため店内でのみタブ表示（本人指示 2026-11-25）
   { id: "sweetage", name: "スイーツ揚げピザ" },
