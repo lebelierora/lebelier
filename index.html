@@ -17,6 +17,7 @@
   <section id="scr-home">
     <button class="btn" id="go-order" style="margin-bottom:12px;">テイクアウト注文をする</button>
     <button class="btn" id="go-dinein" style="margin-bottom:12px;">店内オーダー（お席から注文）</button>
+    <button class="btn" id="go-frozen" style="margin-bottom:12px;">冷凍ピザの店頭予約（翌々日〜1週間先）</button>
     <button class="btn ghost" id="go-status">注文状況を見る</button>
     <div class="card" style="margin-top:16px;">
       <p class="note" style="margin:0;">
@@ -44,6 +45,17 @@
         </button>
         <div class="guide-body hidden">
           <p>ご注文は受け取り日の前日からお受けしています。受け取り時刻は10分刻みで、最短はご注文から30分後です（5点以上のご注文は40分後、10点以上は60分後から）。最終受付は月〜土曜日19:30、日曜日17:30です。木曜日は定休日です。</p>
+        </div>
+      </div>
+      <div class="guide-item">
+        <button class="guide-row guide-toggle" type="button" aria-expanded="false">
+          <span class="guide-main">
+            <span class="guide-title">冷凍ピザの店頭予約について</span>
+          </span>
+          <span class="guide-arrow">▾</span>
+        </button>
+        <div class="guide-body hidden">
+          <p>冷凍ピザは店頭での受け取り予約ができます。ご用意に時間がかかるため、受け取りは翌々日から1週間先まででお願いしています。当日・翌日にご希望の場合は、お電話でご相談ください（できる日はお電話でお受けします）。店頭の冷凍自販機の商品は24時間いつでもその場で買えますので、このページには載せていません。</p>
         </div>
       </div>
       <div class="guide-item">
@@ -199,6 +211,6 @@
 <!-- 通知帯（タップを遮らない） -->
 <div class="toast" id="toast"></div>
 
-<script type="module" src="js/customer.js?v=20251125-18"></script>
+<script type="module" src="js/customer.js?v=20251125-19"></script>
 </body>
 </html>

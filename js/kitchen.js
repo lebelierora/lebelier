@@ -2,13 +2,13 @@
 // テスト段階の簡易保護として PIN ゲートを使う（本番前に Firebase Auth へ移行すること）。
 const KITCHEN_PIN = "2321"; // テスト用PIN（店の電話番号の下4桁）
 
-import { db } from "./firebase-config.js?v=20251125-18";
+import { db } from "./firebase-config.js?v=20251125-19";
 import {
   collection, onSnapshot, query, where, doc, updateDoc, setDoc, deleteDoc, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  todayKey, formatDateJP, lastSlot, toMin, toHHMM, occupiedTime, esc, yen, seatLabel,
-} from "./menu.js?v=20251125-18";
+  todayKey, addDays, isThursday, formatDateJP, lastSlot, toMin, toHHMM, occupiedTime, esc, yen, seatLabel,
+} from "./menu.js?v=20251125-19";
 
 const $ = id => document.getElementById(id);
 
@@ -156,7 +156,8 @@ function proposedTime(o) {
 // 同じ日・同じ時刻に既にある別の有効な注文（確認待ち・確定）を返す。なければ null。
 // 厨房で当日の時刻を調整したときの重複警告に使う。
 function slotConflict(o, hhmm) {
-  return orders.find(x => x.id !== o.id && x.pickupDate === o.pickupDate
+  if (o.kind === "frozen") return null; // 冷凍予約は枠を占有しない
+  return orders.find(x => x.id !== o.id && x.kind !== "frozen" && x.pickupDate === o.pickupDate
     && (x.status === "pending" || x.status === "confirmed") && occupiedTime(x) === hhmm) || null;
 }
 function countdownText(o) {
@@ -181,9 +182,14 @@ function finishedDinein() {
 // 店内＋テイクアウトの統合表示リスト（タブで絞り込み、時刻順に混ぜて並べる）
 function displayActive() {
   const list = [];
-  if (tabFilter !== "dinein")
-    for (const o of activeOrders()) list.push({ kind: "takeout", o, key: o.pickupDate + " " + (o.confirmedPickup || o.requestedPickup) });
-  if (tabFilter !== "takeout")
+  if (tabFilter === "frozen") {
+    for (const o of activeOrders().filter(o => o.kind === "frozen"))
+      list.push({ kind: "takeout", o, key: o.pickupDate + " " + (o.confirmedPickup || o.requestedPickup) });
+  } else if (tabFilter !== "dinein") {
+    for (const o of activeOrders().filter(o => tabFilter !== "takeout" || o.kind !== "frozen"))
+      list.push({ kind: "takeout", o, key: o.pickupDate + " " + (o.confirmedPickup || o.requestedPickup) });
+  }
+  if (tabFilter !== "takeout" && tabFilter !== "frozen")
     for (const o of activeDinein()) list.push({ kind: "dinein", o, key: tsSortKey(o.createdAt) });
   return list.sort((a, b) => a.key.localeCompare(b.key));
 }
@@ -295,7 +301,7 @@ function cardHtml(o) {
   const mainTime = o.status === "confirmed" && o.confirmedPickup ? o.confirmedPickup : o.requestedPickup;
   return `<div class="kcard ${isPending ? "pending" : ""}">
     <div>
-      <div class="pdate"><span class="kind-chip" style="background:#2e86c1;">テイクアウト</span> ${esc(formatDateJP(o.pickupDate))} ／ ${esc(o.orderNo)} ／ ${o.status === "pending" ? "確認待ち" : o.status === "confirmed" ? "確定" : o.status === "done" ? "お渡し済み" : "来店なし"}</div>
+      <div class="pdate">${o.kind === "frozen" ? `<span class="kind-chip" style="background:#5b2c6f;">冷凍予約</span>` : `<span class="kind-chip" style="background:#2e86c1;">テイクアウト</span>`} ${esc(formatDateJP(o.pickupDate))} ／ ${esc(o.orderNo)} ／ ${o.status === "pending" ? "確認待ち" : o.status === "confirmed" ? "確定" : o.status === "done" ? "お渡し済み" : "来店なし"}</div>
       <div class="ptime">${esc(mainTime)}</div>
       ${countdownText(o) ? `<div>${countdownText(o)}</div>` : ""}
     </div>
@@ -314,6 +320,13 @@ function cardHtml(o) {
         <button data-adj="${o.id}|-5">−5分</button>
         <button data-fastest="${o.id}">最短</button>
         <button data-adj="${o.id}|5">＋5分</button>
+      </div>` : o.kind === "frozen" ? `
+      <div style="font-weight:900;font-size:20px;">確定予定：${esc(o.requestedPickup)} <span class="note">希望通り</span></div>
+      <div class="kcustom">冷凍は日付の変更ができます（ご用意できない日は、別の日で受け付けてください）</div>
+      <div class="adj-row" style="margin-top:8px;">
+        <select data-fzdate="${o.id}" style="flex:1;font-size:18px;font-weight:800;min-height:56px;border-radius:12px;border:2px solid var(--line);padding:0 10px;">
+          ${frozenDateOptions(o)}
+        </select>
       </div>` : `
       <div style="font-weight:900;font-size:20px;">確定予定：${esc(o.requestedPickup)} <span class="note">希望通り</span></div>
       <div class="kcustom">前日以前のご予約は、希望時刻のまま受け付けます（時刻の調整は当日のご予約のみ）</div>`}
@@ -330,6 +343,18 @@ function cardHtml(o) {
       <button class="btn ghost" data-noshow="${o.id}">来店なし</button>
     </div>` : ""}
   </div>`;
+}
+
+// 冷凍予約の日付変更候補：希望日から1週間先まで（木曜定休を除く）
+function frozenDateOptions(o) {
+  const base = o.requestedDate || o.pickupDate;
+  const opts = [];
+  for (let i = 0; i <= 7; i++) {
+    const k = addDays(base, i).key;
+    if (isThursday(k)) continue;
+    opts.push(`<option value="${k}" ${k === o.pickupDate ? "selected" : ""}>${esc(formatDateJP(k))}${i === 0 ? "（希望日）" : ""}</option>`);
+  }
+  return opts.join("");
 }
 
 function bindCardButtons() {
@@ -349,9 +374,16 @@ function bindCardButtons() {
     const o = orders.find(x => x.id === b.dataset.accept);
     if (!o) return;
     b.disabled = true;
-    await updateDoc(doc(db, "takeoutOrders", o.id), {
+    const upd = {
       status: "confirmed", confirmedPickup: toHHMM(proposedTime(o)), confirmedAt: serverTimestamp(),
-    });
+    };
+    if (o.kind === "frozen") {
+      const sel = document.querySelector(`[data-fzdate="${o.id}"]`);
+      const newDate = sel ? sel.value : o.pickupDate;
+      upd.pickupDate = newDate;
+      upd.confirmedDate = newDate;
+    }
+    await updateDoc(doc(db, "takeoutOrders", o.id), upd);
   }));
   document.querySelectorAll("[data-done]").forEach(b => b.addEventListener("click", async () => {
     b.disabled = true;

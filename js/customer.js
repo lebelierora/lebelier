@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js?v=20251125-18";
+import { db } from "./firebase-config.js?v=20251125-19";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,7 +7,13 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js?v=20251125-18";
+} from "./menu.js?v=20251125-19";
+import {
+  FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
+} from "./frozen-menu.js?v=20251125-19";
+
+// 焼きピザ・冷凍ピザ両方のメニューから商品を引く
+const anyById = id => menuById(id) || frozenById(id);
 
 const $ = id => document.getElementById(id);
 const screens = ["scr-home", "scr-seat", "scr-order", "scr-detail", "scr-checkout", "scr-dinein", "scr-done", "scr-status"];
@@ -18,8 +24,8 @@ function show(id) {
   window.scrollTo(0, 0);
 }
 
-// ---------- モード（テイクアウト／店内）と席 ----------
-let mode = "takeout"; // "takeout" | "dinein"
+// ---------- モード（テイクアウト／店内／冷凍予約）と席 ----------
+let mode = "takeout"; // "takeout" | "dinein" | "frozen"
 let seat = null;      // 店内モードの席ID
 let seatFixed = false; // ?seat= で固定された席か（席別QR用）
 const seatParam = new URLSearchParams(location.search).get("seat");
@@ -28,6 +34,9 @@ function updateHeader() {
   if (mode === "dinein") {
     $("page-title").textContent = "るべりえ 店内オーダー";
     $("page-sub").textContent = "創作ピザとスイーツのお店 るべりえ（群馬県邑楽町）／お席からご注文いただけます。お会計はお帰りの際にレジでお願いします";
+  } else if (mode === "frozen") {
+    $("page-title").textContent = "るべりえ 冷凍ピザ店頭予約";
+    $("page-sub").textContent = "冷凍ピザの店頭受け取り予約です。受け取りは翌々日から1週間先まで／お支払いは受け取り時にレジでお願いします（現金・PayPay・コハクペイ等）";
   } else {
     $("page-title").textContent = "るべりえ テイクアウト注文";
     $("page-sub").textContent = "創作ピザとスイーツのお店 るべりえ（群馬県邑楽町）／お支払いは受け取り時にレジでお願いします（現金・PayPay・コハクペイ等）";
@@ -35,7 +44,7 @@ function updateHeader() {
 }
 
 // ---------- カート ----------
-const carts = { takeout: [], dinein: [] }; // モードごとに分けて保持
+const carts = { takeout: [], dinein: [], frozen: [] }; // モードごとに分けて保持
 let cart = carts.takeout; // {itemId, qty, cut, pack, choice:label|null, toppings:[label]}
 function setMode(m) {
   mode = m;
@@ -45,7 +54,7 @@ function setMode(m) {
 }
 function cartQty() { return cart.reduce((a, c) => a + c.qty, 0); }
 function cartTotal() {
-  return cart.reduce((a, c) => a + unitPrice(menuById(c.itemId), c.toppings, c.pack, c.choice) * c.qty, 0);
+  return cart.reduce((a, c) => a + unitPrice(anyById(c.itemId), c.toppings, c.pack, c.choice) * c.qty, 0);
 }
 function updateCartbar(pop) {
   const q = cartQty();
@@ -68,13 +77,15 @@ function toast(msg, ms = 1200) {
 // ---------- メニュー ----------
 let currentCat = "seasonal";
 function renderTabs() {
-  $("cat-tabs").innerHTML = CATEGORIES.filter(c => !c.hidden).map(c =>
+  const cats = mode === "frozen" ? FROZEN_CATEGORIES : CATEGORIES.filter(c => !c.hidden);
+  $("cat-tabs").innerHTML = cats.map(c =>
     `<button data-cat="${c.id}" class="${c.id === currentCat ? "active" : ""}">${esc(c.name)}</button>`).join("");
   $("cat-tabs").querySelectorAll("button").forEach(b =>
     b.addEventListener("click", () => { currentCat = b.dataset.cat; renderTabs(); renderGrid(); }));
 }
 function renderGrid() {
-  $("item-grid").innerHTML = itemsForCategory(currentCat).map(m => `
+  const items = mode === "frozen" ? frozenItemsForCategory(currentCat) : itemsForCategory(currentCat);
+  $("item-grid").innerHTML = items.map(m => `
     <button class="item" data-id="${m.id}">
       ${m.img ? `<img src="${esc(m.img)}" alt="${esc(m.name)}" loading="lazy">` : `<div class="noimg">写真なし</div>`}
       <div class="body">
@@ -90,7 +101,7 @@ function renderGrid() {
 // ---------- 商品詳細 ----------
 let detail = null; // {item, cut, pack, choice, toppings:Set, qty}
 function openDetail(id) {
-  const item = menuById(id);
+  const item = anyById(id);
   detail = { item, cut: "nocut", pack: "paper",
              choice: null, // choice は未選択スタート。選ぶまでカートに入れられない
              toppings: new Set(), qty: 1, descOpen: false };
@@ -250,13 +261,17 @@ function watchSlots() {
 function unwatchSlots() { if (slotSub) { slotSub(); slotSub = null; } }
 function dateChipList() {
   const list = [];
-  for (let i = 0; i <= 7; i++) list.push(addDays(todayKey(), i).key);
+  // 冷凍予約は翌々日（+2）から、焼きピザは今日から。どちらも1週間先（+7）まで
+  const from = mode === "frozen" ? 2 : 0;
+  for (let i = from; i <= 7; i++) list.push(addDays(todayKey(), i).key);
   return list;
 }
 function renderDateChips(el, selected, onPick) {
-  el.innerHTML = dateChipList().map((k, i) => `
+  const today = todayKey();
+  const tomorrow = addDays(today, 1).key;
+  el.innerHTML = dateChipList().map(k => `
     <button data-date="${k}" class="${k === selected ? "active" : ""}" ${isThursday(k) ? "disabled" : ""}>
-      ${formatDateJP(k)}${i === 0 ? `<span class="today-badge">今日</span>` : i === 1 ? `<span class="today-badge">明日</span>` : ""}${isThursday(k) ? "（定休日）" : ""}
+      ${formatDateJP(k)}${k === today ? `<span class="today-badge">今日</span>` : k === tomorrow ? `<span class="today-badge">明日</span>` : ""}${isThursday(k) ? "（定休日）" : ""}
     </button>`).join("");
   el.querySelectorAll("button:not(:disabled)").forEach(b =>
     b.addEventListener("click", () => onPick(b.dataset.date)));
@@ -266,7 +281,7 @@ function renderCart() {
     $("cart-list").innerHTML = `<p class="note" style="margin:0;">カートは空です。</p>`;
   } else {
     $("cart-list").innerHTML = cart.map((c, i) => {
-      const it = menuById(c.itemId);
+      const it = anyById(c.itemId);
       const custom = [
         c.cut ? (c.cut === "cut4" ? "4カット" : "未カット") : null,
         c.pack ? (c.pack === "box" ? "箱（+100円）" : "紙皿・ホイル") : null,
@@ -301,7 +316,9 @@ function renderSlots() {
   const slots = timeSlots(selDate, cartQty());
   if (selTime && (!slots.includes(selTime) || occupiedTimes.has(selTime))) selTime = null;
   const lead = leadMinutes(cartQty());
-  $("lead-note").textContent = selDate === todayKey()
+  $("lead-note").textContent = mode === "frozen"
+    ? "冷凍ピザはご用意に時間がかかるため、受け取りは翌々日から1週間先までです。日時はご希望として受け付け、お店が確認して確定します。当日・翌日にお急ぎの場合はお電話ください（0276-70-2321）。"
+    : selDate === todayKey()
     ? (cartQty() >= 5 ? `ご注文点数が多いため、最短で${lead}分後からの受け取りになります。` : `最短で${lead}分後からの受け取りになります。`)
     : "営業時間内（11:00〜最終受け取り 月〜土19:30／日曜17:30）でお選びください。";
   // 既に注文が入っている枠（1枠1注文）は選べないようにする
@@ -316,11 +333,19 @@ function renderSlots() {
     b.addEventListener("click", () => { selTime = b.dataset.slot; renderSlots(); }));
 }
 function openCheckout() {
-  selDate = todayKey(); selTime = null;
+  if (mode === "frozen") {
+    // 冷凍予約の初期日は翌々日（定休日の木曜ならその翌日）
+    selDate = dateChipList().find(k => !isThursday(k));
+  } else {
+    selDate = todayKey();
+  }
+  selTime = null;
   renderCart();
   renderDateChips($("date-chips"), selDate, pickDate);
   renderSlots();
-  watchSlots();
+  // 冷凍予約は焼きピザの枠（1枠1注文）を占有しないため、枠の購読はしない
+  if (mode === "frozen") { unwatchSlots(); occupiedTimes = new Set(); renderSlots(); }
+  else watchSlots();
   const savedName = localStorage.getItem("ruberie_name") || "";
   const savedPhone = localStorage.getItem("ruberie_phone") || "";
   if (savedName) $("cust-name").value = savedName;
@@ -328,13 +353,13 @@ function openCheckout() {
   $("order-error").innerHTML = "";
   show("scr-checkout");
 }
-function pickDate(k) { selDate = k; selTime = null; renderDateChips($("date-chips"), selDate, pickDate); renderSlots(); watchSlots(); }
+function pickDate(k) { selDate = k; selTime = null; renderDateChips($("date-chips"), selDate, pickDate); renderSlots(); if (mode !== "frozen") watchSlots(); }
 
 // ---------- 注文送信 ----------
 function makeOrderNo() {
   const n = new Date();
   const rand = Math.random().toString(36).slice(2, 5).toUpperCase();
-  return `T-${String(n.getTime()).slice(-8)}${rand}`;
+  return `${mode === "frozen" ? "F" : "T"}-${String(n.getTime()).slice(-8)}${rand}`;
 }
 let doneUnsub = null;
 async function submitOrder() {
@@ -358,15 +383,18 @@ async function submitOrder() {
       return err("この番号でのご注文はお受けできません。お電話でご注文ください（0276-70-2321）");
     }
     // 送信直前の重複チェック：同じ受け取り枠（1枠1注文）に別の注文が入っていないか再確認する
-    const sameDay = await getDocs(query(collection(db, "takeoutOrders"), where("pickupDate", "==", selDate)));
-    occupiedTimes = occupiedSlots(sameDay.docs.map(d => d.data()), selDate);
-    if (occupiedTimes.has(selTime)) {
-      btn.disabled = false; btn.textContent = "この内容で注文を送信する";
-      selTime = null; renderSlots();
-      return err("申し訳ありません。その受け取り時刻は別のご注文が入りました。別の時刻をお選びください。");
+    // 冷凍予約は枠を占有しないため、このチェックは焼きピザのみ
+    if (mode !== "frozen") {
+      const sameDay = await getDocs(query(collection(db, "takeoutOrders"), where("pickupDate", "==", selDate)));
+      occupiedTimes = occupiedSlots(sameDay.docs.map(d => d.data()), selDate);
+      if (occupiedTimes.has(selTime)) {
+        btn.disabled = false; btn.textContent = "この内容で注文を送信する";
+        selTime = null; renderSlots();
+        return err("申し訳ありません。その受け取り時刻は別のご注文が入りました。別の時刻をお選びください。");
+      }
     }
     const items = cart.map(c => {
-      const it = menuById(c.itemId);
+      const it = anyById(c.itemId);
       const up = unitPrice(it, c.toppings, c.pack, c.choice);
       return { itemId: c.itemId, name: it.name, qty: c.qty, unitPrice: up, lineTotal: up * c.qty,
                cut: c.cut, pack: c.pack, choice: c.choice || null, toppings: c.toppings || [] };
@@ -374,9 +402,10 @@ async function submitOrder() {
     const orderNo = makeOrderNo();
     const ref = await addDoc(collection(db, "takeoutOrders"), {
       orderNo, name, phone, note,
+      kind: mode === "frozen" ? "frozen" : "takeout",
       items, total: cartTotal(), totalQty: cartQty(),
-      pickupDate: selDate, pickupTime: selTime, requestedPickup: selTime,
-      confirmedPickup: null, status: "pending",
+      pickupDate: selDate, requestedDate: selDate, pickupTime: selTime, requestedPickup: selTime,
+      confirmedPickup: null, confirmedDate: null, status: "pending",
       createdAt: serverTimestamp(),
     });
     localStorage.setItem("ruberie_name", name);
@@ -409,14 +438,17 @@ function showDone(docId, orderNo) {
     if (!snap.exists()) return;
     const o = snap.data();
     let html = `<div class="card" style="text-align:center;">`;
+    if (o.kind === "frozen") html += `<p class="note" style="font-weight:900;font-size:16px;">冷凍ピザの店頭予約</p>`;
     if (o.status === "pending") {
       html += `<div style="font-size:40px;">⌛</div>
         <h2 style="margin:8px 0;">お店の確認待ちです。確定までお待ちください</h2>
         <p class="note">この画面を開いたままでいると、確定が自動で表示されます。<br>閉じてしまった場合は、トップの「注文状況を見る」から確認できます。</p>`;
     } else if (o.status === "confirmed") {
       const changed = o.confirmedPickup && o.confirmedPickup !== o.requestedPickup;
+      const dateChanged = o.confirmedDate && o.requestedDate && o.confirmedDate !== o.requestedDate;
       html += `<div style="font-size:40px;">✅</div>
         <h2 style="margin:8px 0;color:var(--ok);">ご注文が確定しました</h2>
+        ${dateChanged ? `<p style="font-weight:800;color:var(--warn);">受け取り日が ${esc(formatDateJP(o.confirmedDate))} に変更になりました</p>` : ""}
         ${changed ? `<p style="font-weight:800;color:var(--warn);">受け取り時刻が ${esc(o.confirmedPickup)} に変更になりました</p>` : ""}
         <p class="note" style="margin-bottom:2px;">受け取り日時</p>
         <div class="big-time">${esc(formatDateJP(o.pickupDate))}<br>${esc(o.confirmedPickup || o.requestedPickup)}</div>`;
@@ -443,10 +475,12 @@ function searchStatus() {
   if (phone.length < 10) { $("status-results").innerHTML = `<div class="err">電話番号を入力してください。</div>`; return; }
   localStorage.setItem("ruberie_phone", phone);
   if (statusUnsub) statusUnsub();
-  const q = query(collection(db, "takeoutOrders"),
-    where("phone", "==", phone), where("pickupDate", "==", statusDate));
+  const q = query(collection(db, "takeoutOrders"), where("phone", "==", phone));
   statusUnsub = onSnapshot(q, snap => {
+    // 厨房が受け取り日を変更した場合（冷凍予約）でも見つかるよう、
+    // 確定日と希望日のどちらか一致で拾う
     const orders = snap.docs.map(d => d.data())
+      .filter(o => o.pickupDate === statusDate || o.requestedDate === statusDate)
       .sort((a, b) => (a.confirmedPickup || a.requestedPickup).localeCompare(b.confirmedPickup || b.requestedPickup));
     if (orders.length === 0) {
       $("status-results").innerHTML = `<div class="card"><p class="note" style="margin:0;">${esc(formatDateJP(statusDate))}のご注文は見つかりませんでした。</p></div>`;
@@ -455,9 +489,11 @@ function searchStatus() {
     $("status-results").innerHTML = `<h3>${esc(formatDateJP(statusDate))}のご注文（${orders.length}件）</h3>` +
       orders.map(o => `<div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span class="note">注文番号 ${esc(o.orderNo)}</span>${statusChip(o.status)}
+          <span class="note">注文番号 ${esc(o.orderNo)}${o.kind === "frozen" ? "（冷凍ピザ予約）" : ""}</span>${statusChip(o.status)}
         </div>
         <div class="big-time" style="font-size:26px;margin-top:8px;">受け取り：${esc(o.confirmedPickup || o.requestedPickup)}</div>
+        ${o.status === "confirmed" && o.confirmedDate && o.requestedDate && o.confirmedDate !== o.requestedDate
+          ? `<p style="font-weight:800;color:var(--warn);margin:4px 0;">受け取り日が ${esc(formatDateJP(o.confirmedDate))} に変更になりました</p>` : ""}
         ${o.status === "confirmed" && o.confirmedPickup && o.confirmedPickup !== o.requestedPickup
           ? `<p style="font-weight:800;color:var(--warn);margin:4px 0;">受け取り時刻が ${esc(o.confirmedPickup)} に変更になりました</p>` : ""}
         <div style="margin-top:8px;">${(o.items || []).map(i => {
@@ -496,7 +532,7 @@ function renderDineinCart() {
     $("dinein-cart-list").innerHTML = `<p class="note" style="margin:0;">カートは空です。</p>`;
   } else {
     $("dinein-cart-list").innerHTML = cart.map((c, i) => {
-      const it = menuById(c.itemId);
+      const it = anyById(c.itemId);
       const custom = [
         c.cut ? (c.cut === "cut4" ? "4カット" : "未カット") : null,
         c.choice || null,
@@ -547,7 +583,7 @@ async function submitDinein() {
   btn.disabled = true; btn.textContent = "送信中…";
   try {
     const items = cart.map(c => {
-      const it = menuById(c.itemId);
+      const it = anyById(c.itemId);
       const up = unitPrice(it, c.toppings, null, c.choice);
       return { itemId: c.itemId, name: it.name, qty: c.qty, unitPrice: up, lineTotal: up * c.qty,
                cut: c.cut, pack: null, choice: c.choice || null, toppings: c.toppings || [] };
@@ -628,7 +664,8 @@ document.querySelectorAll(".guide-toggle").forEach(btn => {
   });
 });
 
-$("go-order").addEventListener("click", () => { setMode("takeout"); renderTabs(); renderGrid(); show("scr-order"); });
+$("go-order").addEventListener("click", () => { setMode("takeout"); currentCat = "seasonal"; renderTabs(); renderGrid(); show("scr-order"); });
+$("go-frozen").addEventListener("click", () => { setMode("frozen"); currentCat = "fz-set"; renderTabs(); renderGrid(); show("scr-order"); });
 $("go-dinein").addEventListener("click", enterDinein);
 $("seat-back").addEventListener("click", () => { setMode("takeout"); show("scr-home"); });
 $("seat-change").addEventListener("click", () => { seat = null; renderSeatGrid(); show("scr-seat"); });

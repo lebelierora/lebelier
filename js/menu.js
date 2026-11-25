@@ -238,7 +238,7 @@ export function occupiedTime(o) {
 // お渡し済み（done）・来店なし（noshow）は枠を占有しない。
 export function occupiedSlots(list, key) {
   return new Set(list
-    .filter(o => o.pickupDate === key && (o.status === "pending" || o.status === "confirmed"))
+    .filter(o => o.kind !== "frozen" && o.pickupDate === key && (o.status === "pending" || o.status === "confirmed"))
     .map(occupiedTime));
 }
 
