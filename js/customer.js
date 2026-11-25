@@ -49,6 +49,7 @@ let cart = carts.takeout; // {itemId, qty, cut, pack, choice:label|null, topping
 function setMode(m) {
   mode = m;
   cart = carts[m];
+  document.body.classList.toggle("frozen", m === "frozen");
   updateHeader();
   updateCartbar(false);
 }
@@ -152,7 +153,7 @@ function renderDetail() {
   const it = detail.item;
   let html = `
     <div class="card" style="padding:0;overflow:hidden;">
-      ${it.img ? `<img src="${esc(it.img)}" alt="${esc(it.name)}" style="width:100%;aspect-ratio:1/1;object-fit:cover;display:block;">` : ""}
+      ${it.img ? `<img src="${esc(it.img)}" alt="${esc(it.name)}" style="${mode === "frozen" ? "width:100%;aspect-ratio:4/3;object-fit:contain;background:#f6efe3;display:block;" : "width:100%;aspect-ratio:1/1;object-fit:cover;display:block;"}">` : ""}
       <div style="padding:14px;">
         <div style="font-size:20px;font-weight:900;">${esc(it.name)}${it.seasonal ? ` <span class="season-badge">季節メニュー</span>` : ""}</div>
         ${descHtml(it)}
