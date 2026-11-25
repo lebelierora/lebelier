@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js?v=20251125-10";
+import { db } from "./firebase-config.js?v=20251125-11";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,7 +7,7 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js?v=20251125-10";
+} from "./menu.js?v=20251125-11";
 
 const $ = id => document.getElementById(id);
 const screens = ["scr-home", "scr-seat", "scr-order", "scr-detail", "scr-checkout", "scr-dinein", "scr-done", "scr-status"];
@@ -618,6 +618,16 @@ async function callStaff(msgEl) {
 }
 
 // ---------- 初期化 ----------
+// ご案内アコーディオン（初期状態は全て閉）
+document.querySelectorAll(".guide-toggle").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const body = btn.parentElement.querySelector(".guide-body");
+    const open = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!open));
+    body.classList.toggle("hidden", open);
+  });
+});
+
 $("go-order").addEventListener("click", () => { setMode("takeout"); renderTabs(); renderGrid(); show("scr-order"); });
 $("go-dinein").addEventListener("click", enterDinein);
 $("seat-back").addEventListener("click", () => { setMode("takeout"); show("scr-home"); });

@@ -110,6 +110,19 @@ main{max-width:720px;margin:0 auto;padding:14px 14px 120px;}
 .seat-grid button{border:2px solid var(--line);background:#fff;border-radius:14px;padding:18px;font-size:19px;font-weight:800;text-align:left;}
 .seat-grid button:active{background:#eee;}
 
+/* ご案内（トップ画面のアコーディオン＋リンク） */
+.guide{background:var(--card);border:2px solid var(--line);border-radius:16px;overflow:hidden;}
+.guide-item{border-top:2px solid var(--line);}
+.guide-row{display:flex;align-items:center;gap:10px;width:100%;padding:15px 14px;background:none;border:none;text-align:left;text-decoration:none;color:var(--ink);font-size:16px;}
+.guide-row .guide-main{flex:1;display:flex;flex-direction:column;gap:2px;}
+.guide-title{font-weight:800;line-height:1.4;}
+.guide-sub{font-size:12px;color:var(--muted);line-height:1.5;}
+.guide-arrow{flex:0 0 auto;font-size:17px;font-weight:800;color:var(--muted);transition:transform .15s ease;}
+.guide-toggle[aria-expanded="true"] .guide-arrow{transform:rotate(180deg);}
+.guide-body{padding:2px 14px 14px;}
+.guide-body p{margin:8px 0 0;font-size:14px;line-height:1.7;}
+.guide-body .note{font-size:12px;}
+
 .status-chip{display:inline-block;border-radius:999px;padding:3px 12px;font-size:13px;font-weight:800;color:#fff;}
 .status-pending{background:#e67e22;} .status-confirmed{background:var(--ok);} .status-done{background:#7f8c8d;} .status-noshow{background:#555;}
 .big-time{font-size:34px;font-weight:900;line-height:1.2;}
