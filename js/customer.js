@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js?v=20251125-12";
+import { db } from "./firebase-config.js?v=20251125-13";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,7 +7,7 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js?v=20251125-12";
+} from "./menu.js?v=20251125-13";
 
 const $ = id => document.getElementById(id);
 const screens = ["scr-home", "scr-seat", "scr-order", "scr-detail", "scr-checkout", "scr-dinein", "scr-done", "scr-status"];
@@ -68,7 +68,7 @@ function toast(msg, ms = 1200) {
 // ---------- メニュー ----------
 let currentCat = "seasonal";
 function renderTabs() {
-  $("cat-tabs").innerHTML = CATEGORIES.map(c =>
+  $("cat-tabs").innerHTML = CATEGORIES.filter(c => !c.hidden).map(c =>
     `<button data-cat="${c.id}" class="${c.id === currentCat ? "active" : ""}">${esc(c.name)}</button>`).join("");
   $("cat-tabs").querySelectorAll("button").forEach(b =>
     b.addEventListener("click", () => { currentCat = b.dataset.cat; renderTabs(); renderGrid(); }));

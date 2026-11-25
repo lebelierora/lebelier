@@ -15,7 +15,7 @@ export const CATEGORIES = [
   { id: "side", name: "サイドメニュー" },
   { id: "drink", name: "ソフトドリンク" },
   { id: "alcohol", name: "アルコール" },
-  { id: "sweets", name: "スイーツ" },
+  { id: "sweets", name: "スイーツ", hidden: true }, // 一旦保留・非表示（本人指示 2026-11-25）
   { id: "sweetage", name: "スイーツ揚げピザ" },
 ];
 
