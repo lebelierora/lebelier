@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js?v=20251125-3";
+import { db } from "./firebase-config.js?v=20251125-4";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,7 +7,7 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js?v=20251125-3";
+} from "./menu.js?v=20251125-4";
 
 const $ = id => document.getElementById(id);
 const screens = ["scr-home", "scr-seat", "scr-order", "scr-detail", "scr-checkout", "scr-dinein", "scr-done", "scr-status"];
@@ -177,6 +177,7 @@ let selDate = todayKey();
 let selTime = null;
 let occupiedTimes = new Set(); // 選択中の受け取り日に既に注文が入っている時刻（重複防止）
 let slotSub = null;            // 枠の埋まり状況の購読解除関数
+let submitting = false;        // 注文送信中は、自分の注文で枠が埋まった通知を抑制する
 
 // 選択中の日の注文を購読し、埋まっている枠（1枠1注文）を即時に反映する
 function watchSlots() {
@@ -185,7 +186,7 @@ function watchSlots() {
   const q = query(collection(db, "takeoutOrders"), where("pickupDate", "==", selDate));
   slotSub = onSnapshot(q, snap => {
     occupiedTimes = occupiedSlots(snap.docs.map(d => d.data()), selDate);
-    if (selTime && occupiedTimes.has(selTime)) {
+    if (!submitting && selTime && occupiedTimes.has(selTime)) {
       selTime = null;
       toast("選択していた時刻が埋まりました");
     }
@@ -293,6 +294,7 @@ async function submitOrder() {
 
   const btn = $("submit-order");
   btn.disabled = true; btn.textContent = "送信中…";
+  submitting = true;
   try {
     // ブロック済み番号チェック
     const blocked = await getDocs(query(collection(db, "blockedPhones"), where("phone", "==", phone)));
@@ -331,6 +333,7 @@ async function submitOrder() {
     console.error(e);
     err("送信に失敗しました。通信環境をご確認のうえ、もう一度お試しください。");
   } finally {
+    submitting = false;
     btn.disabled = false; btn.textContent = "この内容で注文を送信する";
   }
 }
