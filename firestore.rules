@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // ============================================================
-// るべりえ テイクアウト注文（lebelier）Firestore セキュリティルール
+// るべりえ 注文サイト（lebelier／テイクアウト・店内）Firestore セキュリティルール
 //
 // 現状は「誰でも読み書き可」に近い緩い設定です。理由：
 // - お客さん側はログインなしで注文・状況確認を行うため
@@ -20,6 +20,11 @@ rules_version = '2';
 // いたずらの大量書き込みを防ぐ。あわせて Firebase App Check を有効化する。
 // 4. blockedPhones の読み取りは「自分の番号が含まれているか」の判定だけに
 // 使うため、本番では存在確認専用の仕組み（Functions等）に分離する。
+// 5. 店内注文（dineInOrders）と呼び出し（calls）も同様に、本番では厨房側の
+// 更新（受付・提供済み・対応した）を認証済みユーザーだけに許可し、create 時の
+// フィールド検証（席IDが実在すること・数量と金額の上限・文字列長）を追加する。
+// あわせて App Check を有効化し、calls の削除は管理者のみに限定する
+// （対応済みの履歴を残す運用にする場合は update のみに切り替える）。
 // ============================================================
 
 service cloud.firestore {
@@ -31,6 +36,22 @@ allow read: if true; // テスト段階：状況確認・厨房購読のため�
 allow create: if true; // テスト段階：ログインなし注文のため
 allow update: if true; // テスト段階：厨房の受付操作（PINゲート前提）
 allow delete: if false; // 削除は誰にも許可しない
+}
+
+// 店内注文
+match /dineInOrders/{orderId} {
+allow read: if true; // テスト段階：お客さんの受付状況表示・厨房購読のため全読み可
+allow create: if true; // テスト段階：ログインなし注文のため
+allow update: if true; // テスト段階：厨房の受付操作（PINゲート前提）
+allow delete: if false; // 削除は誰にも許可しない
+}
+
+// 呼び出し（店内のお客さん→厨房）
+// status: "open"（未対応）→ 厨房が「対応した」で "done" に更新する
+match /calls/{callId} {
+allow read: if true; // テスト段階：厨房の購読のため
+allow create: if true; // テスト段階：お客さんの呼び出し送信のため
+allow update, delete: if true; // テスト段階：厨房の対応処理（PINゲート前提）
 }
 
 // 要注意リスト（ノーショーした電話番号）

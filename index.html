@@ -3,19 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>るべりえ テイクアウト注文</title>
+<title>るべりえ 注文サイト</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <header class="top">
-  <h1>るべりえ テイクアウト注文</h1>
+  <h1 id="page-title">るべりえ テイクアウト注文</h1>
   <span class="test-badge">テスト公開中</span>
-  <div class="sub">創作ピザとスイーツのお店 るべりえ（群馬県邑楽町）／お支払いは受け取り時にレジでお願いします（現金・PayPay・コハクペイ等）</div>
+  <div class="sub" id="page-sub">創作ピザとスイーツのお店 るべりえ（群馬県邑楽町）／お支払いは受け取り時にレジでお願いします（現金・PayPay・コハクペイ等）</div>
 </header>
 <main>
   <!-- トップ -->
   <section id="scr-home">
     <button class="btn" id="go-order" style="margin-bottom:12px;">テイクアウト注文をする</button>
+    <button class="btn" id="go-dinein" style="margin-bottom:12px;">店内オーダー（お席から注文）</button>
     <button class="btn ghost" id="go-status">注文状況を見る</button>
     <div class="card" style="margin-top:16px;">
       <p class="note" style="margin:0;">
@@ -26,8 +27,24 @@
     </div>
   </section>
 
+  <!-- 席選択（店内） -->
+  <section id="scr-seat" class="hidden">
+    <h2 style="margin:6px 0;">お席を選んでください</h2>
+    <p class="note">お座りのお席をタップしてください。ご注文はそのお席に紐付いて厨房に届きます。</p>
+    <div class="seat-grid" id="seat-grid"></div>
+    <button class="btn ghost" id="seat-back" style="margin-top:14px;">トップに戻る</button>
+  </section>
+
   <!-- 注文（メニュー） -->
   <section id="scr-order" class="hidden">
+    <div id="dinein-bar" class="card hidden" style="border-color:var(--red);">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-weight:900;font-size:18px;">お席：<span id="dinein-seat-label"></span></span>
+        <button class="btn ghost small" id="seat-change" style="margin-left:auto;">席を変える</button>
+      </div>
+      <button class="btn" id="call-btn-order" style="margin-top:12px;">店員を呼ぶ</button>
+      <p class="note" id="call-msg-order" style="margin:8px 0 0;"></p>
+    </div>
     <div class="tabs" id="cat-tabs"></div>
     <div class="grid" id="item-grid"></div>
   </section>
@@ -78,9 +95,27 @@
     <button class="btn" id="submit-order" style="margin-top:12px;">この内容で注文を送信する</button>
   </section>
 
+  <!-- 店内オーダー確認 -->
+  <section id="scr-dinein" class="hidden">
+    <button class="btn ghost small" id="dinein-back">← メニューに戻る</button>
+    <h2 style="margin:14px 0 6px;">店内オーダーの確認</h2>
+    <div class="card" style="font-size:17px;">お席：<strong id="dinein-checkout-seat"></strong></div>
+    <div class="card" id="dinein-cart-list"></div>
+    <p class="note">送信すると厨房にすぐ届きます。お会計はお帰りの際にレジでお願いします。</p>
+    <div id="dinein-error"></div>
+    <button class="btn" id="submit-dinein" style="margin-top:12px;">この内容で注文する</button>
+    <button class="btn ghost" id="call-btn-checkout" style="margin-top:12px;">店員を呼ぶ</button>
+    <p class="note" id="call-msg-checkout" style="margin:8px 0 0;"></p>
+  </section>
+
   <!-- 送信完了（ライブ更新） -->
   <section id="scr-done" class="hidden">
     <div id="done-body"></div>
+    <div id="done-dinein-extra" class="hidden">
+      <button class="btn" id="call-btn-done" style="margin-top:14px;">店員を呼ぶ</button>
+      <p class="note" id="call-msg-done" style="margin:8px 0 0;"></p>
+      <button class="btn ghost" id="done-more" style="margin-top:10px;">追加で注文する</button>
+    </div>
     <button class="btn ghost" id="done-home" style="margin-top:14px;">トップに戻る</button>
   </section>
 

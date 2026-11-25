@@ -6,19 +6,43 @@ import {
 import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes,
-  normalizePhone, esc, yen,
+  normalizePhone, esc, yen, SEATS, seatLabel,
 } from "./menu.js";
 
 const $ = id => document.getElementById(id);
-const screens = ["scr-home", "scr-order", "scr-detail", "scr-checkout", "scr-done", "scr-status"];
+const screens = ["scr-home", "scr-seat", "scr-order", "scr-detail", "scr-checkout", "scr-dinein", "scr-done", "scr-status"];
 function show(id) {
   screens.forEach(s => $(s).classList.toggle("hidden", s !== id));
   $("cartbar").classList.toggle("hidden", !(id === "scr-order" || id === "scr-detail"));
+  $("dinein-bar").classList.toggle("hidden", !(id === "scr-order" && mode === "dinein"));
   window.scrollTo(0, 0);
 }
 
+// ---------- モード（テイクアウト／店内）と席 ----------
+let mode = "takeout"; // "takeout" | "dinein"
+let seat = null;      // 店内モードの席ID
+let seatFixed = false; // ?seat= で固定された席か（席別QR用）
+const seatParam = new URLSearchParams(location.search).get("seat");
+if (seatParam && SEATS.some(s => s.id === seatParam)) { seat = seatParam; seatFixed = true; }
+function updateHeader() {
+  if (mode === "dinein") {
+    $("page-title").textContent = "るべりえ 店内オーダー";
+    $("page-sub").textContent = "創作ピザとスイーツのお店 るべりえ（群馬県邑楽町）／お席からご注文いただけます。お会計はお帰りの際にレジでお願いします";
+  } else {
+    $("page-title").textContent = "るべりえ テイクアウト注文";
+    $("page-sub").textContent = "創作ピザとスイーツのお店 るべりえ（群馬県邑楽町）／お支払いは受け取り時にレジでお願いします（現金・PayPay・コハクペイ等）";
+  }
+}
+
 // ---------- カート ----------
-let cart = []; // {itemId, qty, cut, pack, toppings:[label]}
+const carts = { takeout: [], dinein: [] }; // モードごとに分けて保持
+let cart = carts.takeout; // {itemId, qty, cut, pack, toppings:[label]}
+function setMode(m) {
+  mode = m;
+  cart = carts[m];
+  updateHeader();
+  updateCartbar(false);
+}
 function cartQty() { return cart.reduce((a, c) => a + c.qty, 0); }
 function cartTotal() {
   return cart.reduce((a, c) => a + unitPrice(menuById(c.itemId), c.toppings, c.pack) * c.qty, 0);
@@ -95,7 +119,10 @@ function renderDetail() {
         <button id="cut-cut4" class="${detail.cut === "cut4" ? "active" : ""}" ${detail.pack === "box" ? "disabled" : ""}>4カット</button>
       </div>
       ${detail.pack === "box" ? `<div class="opt-note">箱はカットなしのお渡しです</div>` : ""}
-    </div>
+    </div>`;
+    // 包装（箱）はテイクアウトのみ。店内では出さない
+    if (mode === "takeout") {
+      html += `
     <div class="opt-group">
       <div class="label">包装</div>
       <div class="opt-row">
@@ -105,6 +132,7 @@ function renderDetail() {
       ${it.noBox ? `<div class="opt-note">バターがこぼれやすいため、箱での提供はしていません</div>`
                  : boxDisabledByCut ? `<div class="opt-note">箱はカットなしのお渡しです</div>` : ""}
     </div>`;
+    }
   }
   if ((it.toppings || []).length) {
     html += `<div class="opt-group"><div class="label">トッピング・変更</div><div class="check-row">` +
@@ -126,7 +154,8 @@ function renderDetail() {
   if (hasCutPack(it)) {
     $("cut-nocut").addEventListener("click", () => { detail.cut = "nocut"; renderDetail(); });
     $("cut-cut4").addEventListener("click", () => { detail.cut = "cut4"; if (detail.pack === "box") detail.pack = "paper"; renderDetail(); });
-    $("pack-paper").addEventListener("click", () => { detail.pack = "paper"; renderDetail(); });
+    const paperBtn = $("pack-paper");
+    if (paperBtn) paperBtn.addEventListener("click", () => { detail.pack = "paper"; renderDetail(); });
     const boxBtn = $("pack-box");
     if (boxBtn && !boxBtn.disabled) boxBtn.addEventListener("click", () => { detail.pack = "box"; detail.cut = "nocut"; renderDetail(); });
   }
@@ -136,7 +165,7 @@ function renderDetail() {
   $("qty-plus").addEventListener("click", () => { if (detail.qty < MAX_QTY) detail.qty++; renderDetail(); });
   $("add-cart").addEventListener("click", () => {
     cart.push({ itemId: it.id, qty: detail.qty, cut: hasCutPack(it) ? detail.cut : null,
-                pack: hasCutPack(it) ? detail.pack : null, toppings: [...detail.toppings] });
+                pack: hasCutPack(it) && mode === "takeout" ? detail.pack : null, toppings: [...detail.toppings] });
     updateCartbar(true);
     toast(`${it.name}をカートに入れました`);
     show("scr-order");
@@ -264,7 +293,7 @@ async function submitOrder() {
     });
     localStorage.setItem("ruberie_name", name);
     localStorage.setItem("ruberie_phone", phone);
-    cart = []; updateCartbar(false);
+    cart.length = 0; updateCartbar(false);
     showDone(ref.id, orderNo);
   } catch (e) {
     console.error(e);
@@ -283,6 +312,8 @@ function statusChip(st) {
 }
 function showDone(docId, orderNo) {
   show("scr-done");
+  $("done-dinein-extra").classList.add("hidden");
+  if (dineinDoneUnsub) { dineinDoneUnsub(); dineinDoneUnsub = null; }
   if (doneUnsub) doneUnsub();
   doneUnsub = onSnapshot(doc(db, "takeoutOrders", docId), snap => {
     if (!snap.exists()) return;
@@ -350,8 +381,163 @@ function searchStatus() {
   });
 }
 
+// ---------- 店内オーダー ----------
+function renderSeatGrid() {
+  $("seat-grid").innerHTML = SEATS.map(s =>
+    `<button data-seat="${s.id}">${esc(s.label)}</button>`).join("");
+  $("seat-grid").querySelectorAll("button").forEach(b =>
+    b.addEventListener("click", () => { seat = b.dataset.seat; enterDineinMenu(); }));
+}
+function enterDinein() {
+  setMode("dinein");
+  if (seat) enterDineinMenu();
+  else { renderSeatGrid(); show("scr-seat"); }
+}
+function enterDineinMenu() {
+  $("dinein-seat-label").textContent = seatLabel(seat);
+  $("seat-change").classList.toggle("hidden", seatFixed);
+  $("call-msg-order").textContent = "";
+  renderTabs(); renderGrid();
+  show("scr-order");
+}
+function renderDineinCart() {
+  if (cart.length === 0) {
+    $("dinein-cart-list").innerHTML = `<p class="note" style="margin:0;">カートは空です。</p>`;
+  } else {
+    $("dinein-cart-list").innerHTML = cart.map((c, i) => {
+      const it = menuById(c.itemId);
+      const custom = [
+        c.cut ? (c.cut === "cut4" ? "4カット" : "未カット") : null,
+        ...(c.toppings || []),
+      ].filter(Boolean).join("／");
+      return `<div class="cart-line">
+        <div class="grow">
+          <div class="nm">${esc(it.name)}</div>
+          ${custom ? `<div class="custom">${esc(custom)}</div>` : ""}
+          <div class="mini-stepper" style="margin-top:6px;">
+            <button data-ddec="${i}">−</button><span style="font-weight:800;">${c.qty}</span><button data-dinc="${i}">＋</button>
+            <button class="del-btn" data-ddel="${i}">削除</button>
+          </div>
+        </div>
+        <div class="amt">${yen(unitPrice(it, c.toppings, c.pack) * c.qty)}</div>
+      </div>`;
+    }).join("") + `<div style="text-align:right;font-weight:900;font-size:19px;padding-top:10px;">合計 ${yen(cartTotal())}</div>`;
+    $("dinein-cart-list").querySelectorAll("[data-dinc]").forEach(b => b.addEventListener("click", () => {
+      const c = cart[+b.dataset.dinc]; if (c.qty < MAX_QTY) c.qty++; renderDineinCart(); updateCartbar(false);
+    }));
+    $("dinein-cart-list").querySelectorAll("[data-ddec]").forEach(b => b.addEventListener("click", () => {
+      const c = cart[+b.dataset.ddec]; if (c.qty > 1) c.qty--; else cart.splice(+b.dataset.ddec, 1);
+      renderDineinCart(); updateCartbar(false);
+    }));
+    $("dinein-cart-list").querySelectorAll("[data-ddel]").forEach(b => b.addEventListener("click", () => {
+      cart.splice(+b.dataset.ddel, 1); renderDineinCart(); updateCartbar(false);
+    }));
+  }
+}
+function openDineinCheckout() {
+  $("dinein-checkout-seat").textContent = seatLabel(seat);
+  $("dinein-error").innerHTML = "";
+  $("call-msg-checkout").textContent = "";
+  renderDineinCart();
+  show("scr-dinein");
+}
+function makeDineinNo() {
+  const n = new Date();
+  const rand = Math.random().toString(36).slice(2, 5).toUpperCase();
+  return `D-${String(n.getTime()).slice(-8)}${rand}`;
+}
+let dineinDoneUnsub = null;
+async function submitDinein() {
+  const err = msg => { $("dinein-error").innerHTML = `<div class="err" style="margin-top:12px;">${esc(msg)}</div>`; };
+  if (!seat) return err("お席が選ばれていません。メニュー画面からお席を選び直してください。");
+  if (cart.length === 0) return err("カートが空です。メニューから商品をお選びください。");
+  const btn = $("submit-dinein");
+  btn.disabled = true; btn.textContent = "送信中…";
+  try {
+    const items = cart.map(c => {
+      const it = menuById(c.itemId);
+      const up = unitPrice(it, c.toppings, null);
+      return { itemId: c.itemId, name: it.name, qty: c.qty, unitPrice: up, lineTotal: up * c.qty,
+               cut: c.cut, pack: null, toppings: c.toppings || [] };
+    });
+    const orderNo = makeDineinNo();
+    const ref = await addDoc(collection(db, "dineInOrders"), {
+      orderNo, seat, seatLabel: seatLabel(seat),
+      items, total: cartTotal(), totalQty: cartQty(),
+      status: "pending",
+      createdAt: serverTimestamp(),
+    });
+    cart.length = 0; updateCartbar(false);
+    showDineinDone(ref.id, orderNo);
+  } catch (e) {
+    console.error(e);
+    err("送信に失敗しました。通信環境をご確認のうえ、もう一度お試しください。");
+  } finally {
+    btn.disabled = false; btn.textContent = "この内容で注文する";
+  }
+}
+function showDineinDone(docId, orderNo) {
+  show("scr-done");
+  $("done-dinein-extra").classList.remove("hidden");
+  $("call-msg-done").textContent = "";
+  if (doneUnsub) { doneUnsub(); doneUnsub = null; }
+  if (dineinDoneUnsub) dineinDoneUnsub();
+  dineinDoneUnsub = onSnapshot(doc(db, "dineInOrders", docId), snap => {
+    if (!snap.exists()) return;
+    const o = snap.data();
+    let html = `<div class="card" style="text-align:center;">`;
+    if (o.status === "pending") {
+      html += `<div style="font-size:40px;">⌛</div>
+        <h2 style="margin:8px 0;">お店の確認待ちです。確定までお待ちください</h2>
+        <p class="note">この画面を開いたままでいると、受付状況が自動で表示されます。</p>`;
+    } else if (o.status === "accepted") {
+      html += `<div style="font-size:40px;">🔔</div>
+        <h2 style="margin:8px 0;color:var(--ok);">受付しました</h2>
+        <p class="note">ご用意でき次第、お席までお持ちします。</p>`;
+    } else if (o.status === "done") {
+      html += `<h2 style="margin:8px 0;">提供済みです。ありがとうございました</h2>`;
+    }
+    html += `<p class="note" style="margin-top:12px;">注文番号：${esc(o.orderNo || orderNo)}<br>
+      お席：${esc(o.seatLabel || seatLabel(o.seat))}<br>
+      合計：${yen(o.total)}（お会計はお帰りの際にレジでお願いします）</p></div>`;
+    $("done-body").innerHTML = html;
+  });
+}
+
+// ---------- 店員を呼ぶ ----------
+let callBusy = false;
+async function callStaff(msgEl) {
+  if (!seat) { msgEl.textContent = "先にお席をお選びください。"; return; }
+  if (callBusy) return;
+  callBusy = true;
+  try {
+    await addDoc(collection(db, "calls"), {
+      seat, seatLabel: seatLabel(seat), status: "open",
+      createdAt: serverTimestamp(),
+    });
+    msgEl.textContent = "店員を呼びました。お席でお待ちください。";
+  } catch (e) {
+    console.error(e);
+    msgEl.textContent = "呼び出しに失敗しました。お近くの店員にお声がけください。";
+  }
+  setTimeout(() => { callBusy = false; }, 3000);
+}
+
 // ---------- 初期化 ----------
-$("go-order").addEventListener("click", () => { renderTabs(); renderGrid(); show("scr-order"); });
+$("go-order").addEventListener("click", () => { setMode("takeout"); renderTabs(); renderGrid(); show("scr-order"); });
+$("go-dinein").addEventListener("click", enterDinein);
+$("seat-back").addEventListener("click", () => { setMode("takeout"); show("scr-home"); });
+$("seat-change").addEventListener("click", () => { seat = null; renderSeatGrid(); show("scr-seat"); });
+$("dinein-back").addEventListener("click", () => show("scr-order"));
+$("submit-dinein").addEventListener("click", submitDinein);
+$("call-btn-order").addEventListener("click", () => callStaff($("call-msg-order")));
+$("call-btn-checkout").addEventListener("click", () => callStaff($("call-msg-checkout")));
+$("call-btn-done").addEventListener("click", () => callStaff($("call-msg-done")));
+$("done-more").addEventListener("click", () => {
+  if (dineinDoneUnsub) dineinDoneUnsub();
+  $("done-dinein-extra").classList.add("hidden");
+  enterDineinMenu();
+});
 $("go-status").addEventListener("click", () => {
   statusDate = todayKey();
   renderDateChips($("status-date-chips"), statusDate, pickStatusDate);
@@ -362,8 +548,19 @@ $("go-status").addEventListener("click", () => {
 $("detail-back").addEventListener("click", () => show("scr-order"));
 $("checkout-back").addEventListener("click", () => show("scr-order"));
 $("status-back").addEventListener("click", () => show("scr-home"));
-$("done-home").addEventListener("click", () => { if (doneUnsub) doneUnsub(); show("scr-home"); });
-$("cartbar-btn").addEventListener("click", () => { if (cartQty() > 0) openCheckout(); });
+$("done-home").addEventListener("click", () => {
+  if (doneUnsub) doneUnsub();
+  if (dineinDoneUnsub) dineinDoneUnsub();
+  $("done-dinein-extra").classList.add("hidden");
+  setMode("takeout");
+  show("scr-home");
+});
+$("cartbar-btn").addEventListener("click", () => {
+  if (cartQty() === 0) return;
+  if (mode === "dinein") openDineinCheckout(); else openCheckout();
+});
 $("submit-order").addEventListener("click", submitOrder);
 $("status-search").addEventListener("click", searchStatus);
 updateCartbar(false);
+// 席別QR（?seat=）で開かれた場合は、その席で店内オーダーを直接開始する
+if (seatFixed) enterDinein();

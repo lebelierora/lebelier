@@ -43,6 +43,12 @@
   .diff-up{color:var(--warn);font-weight:900;} .diff-down{color:#2e86c1;font-weight:900;}
   details.finished{margin-top:18px;}
   details.finished summary{font-weight:900;font-size:17px;cursor:pointer;padding:10px 0;}
+  #calls-area{margin:12px 0;}
+  .call-card{background:#fdedec;border:3px solid var(--warn);border-radius:18px;padding:14px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px;animation:flash 1.1s steps(2,start) infinite;}
+  .call-seat{font-weight:900;line-height:1.1;}
+  .density-xl .call-seat{font-size:52px;} .density-lg .call-seat{font-size:44px;}
+  .density-md .call-seat{font-size:38px;} .density-sm .call-seat{font-size:32px;}
+  .kind-chip{display:inline-block;border-radius:999px;padding:2px 12px;font-size:14px;font-weight:900;color:#fff;background:#7d6608;}
   .pin-wrap{max-width:360px;margin:60px auto;text-align:center;}
   .pin-wrap input{font-size:28px;text-align:center;letter-spacing:.4em;width:100%;padding:14px;border:2px solid var(--line);border-radius:12px;}
 </style>
@@ -51,7 +57,7 @@
 <header class="top">
   <h1>るべりえ 厨房受付</h1>
   <span class="test-badge">テスト公開中</span>
-  <div class="sub">テイクアウト注文の受付画面です。新しい注文は自動で表示されます。</div>
+  <div class="sub">テイクアウト注文と店内オーダーの受付画面です。新しい注文・呼び出しは自動で表示されます。</div>
 </header>
 
 <!-- PINゲート（テスト段階の簡易保護） -->
@@ -72,11 +78,17 @@
     <button class="btn ghost small" id="sound-btn">音を有効にする</button>
     <span class="note" id="sound-state">音声：未設定（ボタンを押すと鳴るようになります）</span>
   </div>
+  <div class="tabs" id="kind-tabs" style="margin-top:4px;">
+    <button data-tab="all" class="active">すべて</button>
+    <button data-tab="dinein">店内</button>
+    <button data-tab="takeout">テイクアウト</button>
+  </div>
+  <div id="calls-area" class="hidden"></div>
   <div id="order-grid" class="kgrid"></div>
   <p class="note hidden" id="no-orders" style="font-size:17px;margin-top:20px;">現在、対応中の注文はありません。</p>
 
   <details class="finished">
-    <summary>完了した注文（お渡し済み・来店なし）</summary>
+    <summary>完了した注文（お渡し済み・提供済み・来店なし）</summary>
     <div id="finished-list" class="kgrid" style="margin-top:10px;"></div>
   </details>
 
@@ -88,6 +100,7 @@
 
 <div class="flash-banner hidden" id="flash-banner">新しい注文があります</div>
 <audio id="order-sound" src="audio/moko-order-v2.mp3" preload="auto"></audio>
+<audio id="call-sound" src="audio/moko-call-v2.mp3" preload="auto"></audio>
 
 <script type="module" src="js/kitchen.js"></script>
 </body>

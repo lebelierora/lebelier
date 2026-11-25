@@ -94,6 +94,11 @@ main{max-width:720px;margin:0 auto;padding:14px 14px 120px;}
 .mini-stepper button{width:36px;height:36px;border-radius:50%;border:2px solid var(--line);background:#fff;font-size:18px;font-weight:800;}
 .del-btn{background:none;border:none;color:var(--warn);font-weight:700;font-size:13px;}
 
+/* 席選択（店内） */
+.seat-grid{display:flex;flex-direction:column;gap:10px;}
+.seat-grid button{border:2px solid var(--line);background:#fff;border-radius:14px;padding:18px;font-size:19px;font-weight:800;text-align:left;}
+.seat-grid button:active{background:#eee;}
+
 .status-chip{display:inline-block;border-radius:999px;padding:3px 12px;font-size:13px;font-weight:800;color:#fff;}
 .status-pending{background:#e67e22;} .status-confirmed{background:var(--ok);} .status-done{background:#7f8c8d;} .status-noshow{background:#555;}
 .big-time{font-size:34px;font-weight:900;line-height:1.2;}

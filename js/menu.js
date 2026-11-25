@@ -1,4 +1,4 @@
-// るべりえ テイクアウト注文 - メニューデータと共通ユーティリティ
+// るべりえ 注文サイト（テイクアウト／店内）- メニューデータと共通ユーティリティ
 // メニューのマスターは店内版診断ページ（Canvaメニューブック準拠）の実データ。
 // 試作と同じ16品（ホール6／揚げ6／スイーツピザ2／サイド2）。
 
@@ -185,3 +185,18 @@ export function esc(s) {
 }
 
 export function yen(n) { return "¥" + Number(n).toLocaleString("ja-JP"); }
+
+// ---------- 店内オーダーの席 ----------
+export const SEATS = [
+  { id: "counter1", label: "カウンター1" },
+  { id: "counter2", label: "カウンター2" },
+  { id: "counter3", label: "カウンター3" },
+  { id: "counter4", label: "カウンター4" },
+  { id: "table", label: "テーブル席" },
+  { id: "terrace1", label: "テラス1" },
+  { id: "terrace2", label: "テラス2" },
+];
+export function seatLabel(id) {
+  const s = SEATS.find(s => s.id === id);
+  return s ? s.label : id;
+}

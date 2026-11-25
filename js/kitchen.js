@@ -1,4 +1,4 @@
-// 厨房受付ロジック：テイクアウト注文のリアルタイム表示・受付・完了・ブロック管理
+// 厨房受付ロジック：テイクアウト注文＋店内オーダーのリアルタイム表示・受付・完了・呼び出し対応・ブロック管理
 // テスト段階の簡易保護として PIN ゲートを使う（本番前に Firebase Auth へ移行すること）。
 const KITCHEN_PIN = "2321"; // テスト用PIN（店の電話番号の下4桁）
 
@@ -7,7 +7,7 @@ import {
   collection, onSnapshot, query, where, doc, updateDoc, setDoc, deleteDoc, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  todayKey, formatDateJP, lastSlot, toMin, toHHMM, esc, yen,
+  todayKey, formatDateJP, lastSlot, toMin, toHHMM, esc, yen, seatLabel,
 } from "./menu.js";
 
 const $ = id => document.getElementById(id);
@@ -27,11 +27,18 @@ function tryPin() {
 
 // ---------- 状態 ----------
 let orders = [];        // takeoutOrders のスナップショット（全件→表示対象を抽出）
+let dineinOrders = [];  // dineInOrders のスナップショット
+let calls = [];         // calls（status=open のもの）
 let blocked = [];       // blockedPhones
 let adj = {};           // docId -> 確定予定時刻の調整オフセット（分）
+let tabFilter = "all";  // "all" | "dinein" | "takeout"
 let soundEnabled = false;
 let knownPending = new Set();
+let knownDineinPending = new Set();
+let knownCalls = new Set();
 let started = false;
+let startedDinein = false;
+let startedCalls = false;
 
 function openKitchen() {
   $("pin-gate").classList.add("hidden");
@@ -52,12 +59,52 @@ function startListeners() {
     started = true;
     render();
   });
+  onSnapshot(collection(db, "dineInOrders"), snap => {
+    dineinOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const pendingIds = new Set(dineinOrders.filter(o => o.status === "pending").map(o => o.id));
+    if (startedDinein) {
+      for (const id of pendingIds) if (!knownDineinPending.has(id)) playSound();
+    }
+    knownDineinPending = pendingIds;
+    startedDinein = true;
+    render();
+  });
+  onSnapshot(query(collection(db, "calls"), where("status", "==", "open")), snap => {
+    calls = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => tsMillis(a.createdAt) - tsMillis(b.createdAt));
+    const ids = new Set(calls.map(c => c.id));
+    if (startedCalls) {
+      for (const id of ids) if (!knownCalls.has(id)) playCallSound();
+    }
+    knownCalls = ids;
+    startedCalls = true;
+    renderCalls();
+  });
   onSnapshot(collection(db, "blockedPhones"), snap => {
     blocked = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderBlocked();
   });
   setInterval(render, 30000); // カウントダウン更新
-  setInterval(() => { if (orders.some(o => o.status === "pending" && isVisible(o))) playSound(); }, 4000); // 未受付がある間は繰り返し
+  // 未受付がある間は繰り返し知らせる（注文＝注文の声、呼び出し＝呼び出しの声）
+  setInterval(() => {
+    if (orders.some(o => o.status === "pending" && isVisible(o)) ||
+        dineinOrders.some(o => o.status === "pending")) playSound();
+    if (calls.length > 0) playCallSound();
+  }, 4000);
+}
+
+// Firestore Timestamp → ミリ秒（未確定なら大きい値にして後ろに並べる）
+function tsMillis(ts) { return ts && ts.toMillis ? ts.toMillis() : Number.MAX_SAFE_INTEGER; }
+// 統合表示のソートキー（JSTの日付+時刻文字列）
+function tsSortKey(ts) {
+  if (!ts || !ts.toDate) return "9999-99-99 99:99";
+  const parts = {};
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+  for (const p of fmt.formatToParts(ts.toDate())) parts[p.type] = p.value;
+  return `${parts.year}-${parts.month}-${parts.day} ${String(+parts.hour % 24).padStart(2, "0")}:${parts.minute}`;
 }
 
 // 表示対象：受け取り日が昨日以降（過ぎた未完了も見落とさない）
@@ -115,22 +162,108 @@ function countdownText(o) {
   return `<span class="countdown over">受け取り時刻を過ぎています</span>`;
 }
 
+function activeDinein() {
+  return dineinOrders.filter(o => o.status === "pending" || o.status === "accepted")
+    .sort((a, b) => tsMillis(a.createdAt) - tsMillis(b.createdAt));
+}
+function finishedDinein() {
+  return dineinOrders.filter(o => o.status === "done")
+    .sort((a, b) => tsMillis(b.createdAt) - tsMillis(a.createdAt));
+}
+// 店内＋テイクアウトの統合表示リスト（タブで絞り込み、時刻順に混ぜて並べる）
+function displayActive() {
+  const list = [];
+  if (tabFilter !== "dinein")
+    for (const o of activeOrders()) list.push({ kind: "takeout", o, key: o.pickupDate + " " + (o.confirmedPickup || o.requestedPickup) });
+  if (tabFilter !== "takeout")
+    for (const o of activeDinein()) list.push({ kind: "dinein", o, key: tsSortKey(o.createdAt) });
+  return list.sort((a, b) => a.key.localeCompare(b.key));
+}
+function displayFinished() {
+  const list = [];
+  for (const o of finishedOrders()) list.push({ kind: "takeout", o, key: o.pickupDate + " " + o.requestedPickup });
+  for (const o of finishedDinein()) list.push({ kind: "dinein", o, key: tsSortKey(o.createdAt) });
+  return list.sort((a, b) => b.key.localeCompare(a.key));
+}
+
 function render() {
-  const act = activeOrders();
-  const pend = act.filter(o => o.status === "pending").length;
-  const conf = act.filter(o => o.status === "confirmed").length;
+  const disp = displayActive();
+  // サマリーは店内＋テイクアウト合算（タブの絞り込みには影響されない）
+  const pend = orders.filter(o => o.status === "pending").length
+             + dineinOrders.filter(o => o.status === "pending").length;
+  const conf = orders.filter(o => o.status === "confirmed").length
+             + dineinOrders.filter(o => o.status === "accepted").length;
   $("sum-pending").textContent = `未受付 ${pend}件`;
   $("sum-confirmed").textContent = `対応中 ${conf}件`;
   $("flash-banner").classList.toggle("hidden", pend === 0);
   $("flash-banner").textContent = `新しい注文 ${pend}件`;
-  $("no-orders").classList.toggle("hidden", act.length > 0);
+  $("no-orders").classList.toggle("hidden", disp.length > 0);
   const main = $("kitchen-main");
   main.classList.remove("density-xl", "density-lg", "density-md", "density-sm");
-  main.classList.add(act.length <= 2 ? "density-xl" : act.length <= 4 ? "density-lg" : act.length <= 6 ? "density-md" : "density-sm");
-  $("order-grid").innerHTML = act.map(cardHtml).join("");
-  $("finished-list").innerHTML = finishedOrders().map(cardHtml).join("");
+  main.classList.add(disp.length <= 2 ? "density-xl" : disp.length <= 4 ? "density-lg" : disp.length <= 6 ? "density-md" : "density-sm");
+  $("order-grid").innerHTML = disp.map(e => e.kind === "takeout" ? cardHtml(e.o) : dineinCardHtml(e.o)).join("");
+  $("finished-list").innerHTML = displayFinished().map(e => e.kind === "takeout" ? cardHtml(e.o) : dineinCardHtml(e.o)).join("");
   bindCardButtons();
+  bindDineinButtons();
 }
+
+// ---------- 店内オーダーのカード ----------
+function dineinCardHtml(o) {
+  const isPending = o.status === "pending";
+  const stLabel = o.status === "pending" ? "確認待ち" : o.status === "accepted" ? "受付済み" : "提供済み";
+  return `<div class="kcard ${isPending ? "pending" : ""}">
+    <div>
+      <div class="pdate"><span class="kind-chip">店内</span> ／ ${esc(o.orderNo)} ／ ${stLabel}</div>
+      <div class="ptime">${esc(o.seatLabel || seatLabel(o.seat))}</div>
+    </div>
+    <div>${itemsHtml(o)}</div>
+    <div class="ktotal">合計 ${yen(o.total)}</div>
+    ${isPending ? `
+    <div class="act-row">
+      <button class="btn" data-daccept="${o.id}">受付する</button>
+    </div>` : ""}
+    ${o.status === "accepted" ? `
+    <div class="act-row">
+      <button class="btn" data-ddone="${o.id}">提供済みにする</button>
+    </div>` : ""}
+  </div>`;
+}
+function bindDineinButtons() {
+  document.querySelectorAll("[data-daccept]").forEach(b => b.addEventListener("click", async () => {
+    b.disabled = true;
+    await updateDoc(doc(db, "dineInOrders", b.dataset.daccept), { status: "accepted", acceptedAt: serverTimestamp() });
+  }));
+  document.querySelectorAll("[data-ddone]").forEach(b => b.addEventListener("click", async () => {
+    b.disabled = true;
+    await updateDoc(doc(db, "dineInOrders", b.dataset.ddone), { status: "done", doneAt: serverTimestamp() });
+  }));
+}
+
+// ---------- 呼び出し ----------
+function renderCalls() {
+  const area = $("calls-area");
+  if (calls.length === 0) { area.innerHTML = ""; area.classList.add("hidden"); return; }
+  area.classList.remove("hidden");
+  area.innerHTML = `<h2 style="margin:4px 0 10px;">🔔 呼び出し ${calls.length}件</h2>` +
+    calls.map(c => `<div class="call-card">
+      <div class="call-seat">${esc(c.seatLabel || seatLabel(c.seat))}</div>
+      <div style="font-weight:800;">店員を呼んでいます</div>
+      <div class="act-row">
+        <button class="btn" data-call-done="${c.id}">対応した</button>
+      </div>
+    </div>`).join("");
+  area.querySelectorAll("[data-call-done]").forEach(b => b.addEventListener("click", async () => {
+    b.disabled = true;
+    await updateDoc(doc(db, "calls", b.dataset.callDone), { status: "done", handledAt: serverTimestamp() });
+  }));
+}
+
+// ---------- 絞り込みタブ ----------
+document.querySelectorAll("#kind-tabs button").forEach(b => b.addEventListener("click", () => {
+  tabFilter = b.dataset.tab;
+  document.querySelectorAll("#kind-tabs button").forEach(x => x.classList.toggle("active", x === b));
+  render();
+}));
 
 function itemsHtml(o) {
   return (o.items || []).map(i => {
@@ -151,7 +284,7 @@ function cardHtml(o) {
   const mainTime = o.status === "confirmed" && o.confirmedPickup ? o.confirmedPickup : o.requestedPickup;
   return `<div class="kcard ${isPending ? "pending" : ""}">
     <div>
-      <div class="pdate">${esc(formatDateJP(o.pickupDate))} ／ ${esc(o.orderNo)} ／ ${o.status === "pending" ? "確認待ち" : o.status === "confirmed" ? "確定" : o.status === "done" ? "お渡し済み" : "来店なし"}</div>
+      <div class="pdate"><span class="kind-chip" style="background:#2e86c1;">テイクアウト</span> ${esc(formatDateJP(o.pickupDate))} ／ ${esc(o.orderNo)} ／ ${o.status === "pending" ? "確認待ち" : o.status === "confirmed" ? "確定" : o.status === "done" ? "お渡し済み" : "来店なし"}</div>
       <div class="ptime">${esc(mainTime)}</div>
       ${countdownText(o) ? `<div>${countdownText(o)}</div>` : ""}
     </div>
@@ -242,9 +375,15 @@ function playSound() {
   a.currentTime = 0;
   a.play().catch(() => {});
 }
+function playCallSound() {
+  if (!soundEnabled) return;
+  const a = $("call-sound");
+  a.currentTime = 0;
+  a.play().catch(() => {});
+}
 $("sound-btn").addEventListener("click", () => {
   soundEnabled = true;
-  $("sound-state").textContent = "音声：有効（新しい注文でモコの声が鳴ります）";
+  $("sound-state").textContent = "音声：有効（新しい注文・呼び出しでモコの声が鳴ります）";
   $("sound-btn").textContent = "音をテストする";
   playSound();
 });
