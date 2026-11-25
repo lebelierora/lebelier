@@ -138,7 +138,7 @@ export const MENU = [
   { id: "otona-cream-soda", cat: "alcohol", name: "大人のクリームソーダ", price: 600, desc: "ミントのお酒を使ったクリームソーダ。", dineInOnly: true, toppings: [] },
   { id: "limoncello", cat: "alcohol", name: "リモンチェッロ", img: "images/limoncello.jpg", price: 400, desc: "レモンのリキュール。", dineInOnly: true, choice: { label: "飲み方をお選びください", options: [{ label: "ショット", delta: 0 }, { label: "ソーダ割り", delta: 100 }] }, toppings: [] },
   { id: "lemon-chuhai", cat: "alcohol", name: "レモンチューハイ", img: "images/lemon-chuhai.jpg", price: 450, desc: "レモンのチューハイ。", dineInOnly: true, toppings: [] },
-  { id: "liqueur", cat: "alcohol", name: "リキュール各種", price: 500, desc: "種類をお選びください。", dineInOnly: true, choice: { label: "種類をお選びください", options: [{ label: "パスティス", delta: 0 }, { label: "カルヴァドス", delta: 0 }, { label: "アマレット", delta: 0 }, { label: "ジン", delta: 0 }, { label: "ラム", delta: 0 }, { label: "ジェット（ミント）", delta: 0 }, { label: "カンパリ", delta: 0 }] }, toppings: [] },
+  { id: "liqueur", cat: "alcohol", name: "リキュール各種（ソーダ割り）", price: 500, desc: "すべてソーダ割りでご提供します。種類をお選びください。", dineInOnly: true, choice: { label: "種類をお選びください", options: [{ label: "パスティス", delta: 0 }, { label: "カルヴァドス", delta: 0 }, { label: "アマレット", delta: 0 }, { label: "ジン", delta: 0 }, { label: "ラム", delta: 0 }, { label: "ジェット（ミント）", delta: 0 }, { label: "カンパリ", delta: 0 }] }, toppings: [] },
   // ---- スイーツ ----
   { id: "apple-caramel-parfait", cat: "sweets", name: "りんごとキャラメルのミニパフェ", price: 600, desc: "", hidden: true, toppings: [] },
   { id: "gateau-chocolat", cat: "sweets", name: "ガトーショコラ", img: "images/gateau-chocolat.jpg", price: 500, desc: "濃厚なカカオの風味としっとりとした口どけ。食後にぴったりの定番スイーツです。", dineInOnly: true, toppings: [{ label: "バニラアイス", delta: 150 }] },
