@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js<<?v=20251125-30";
+import { db } from "./firebase-config.js<<?v=20251125-31";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,10 +7,10 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js<<?v=20251125-30";
+} from "./menu.js<<?v=20251125-31";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
-} from "./frozen-menu.js<<?v=20251125-30";
+} from "./frozen-menu.js<<?v=20251125-31";
 
 // 焼きピザ・冷凍ピザ両方のメニューから商品を引く
 const anyById = id => menuById(id) || frozenById(id);
@@ -91,7 +91,7 @@ function renderGrid() {
     .filter(m => !m.hidden && (mode === "dinein" || !m.dineInOnly)); // dineInOnly の商品は店内モードでのみ表示する／hidden の商品は常に出さない
   $("item-grid").innerHTML = items.map(m => `
     <button class="item" data-id="${m.id}">
-      ${m.img ? `<img src="${esc(m.img)}" alt="${esc(m.name)}" loading="lazy"${m.poster ? ` style="object-fit:contain;background:#f6efe3;"` : ""}>` : `<div class="noimg">写真なし</div>`}
+      ${effImg(m) ? `<img src="${esc(effImg(m))}" alt="${esc(m.name)}" loading="lazy"${m.poster ? ` style="object-fit:contain;background:#f6efe3;"` : ""}>` : `<div class="noimg">写真なし</div>`}
       <div class="body">
         <div class="name">${esc(m.name)}${m.seasonal ? ` <span class="season-badge">季節</span>` : ""}</div>
         <!-- 一覧では説明文を表示しない（本人指示 2026-11-25：見づらいため。説明は詳細画面のみ） -->
@@ -101,6 +101,10 @@ function renderGrid() {
   $("item-grid").querySelectorAll(".item").forEach(b =>
     b.addEventListener("click", () => openDetail(b.dataset.id)));
 }
+
+// 店内だけ写真・説明を差し替える商品用（例：生ビールは店内=ゴブレット／テイクアウト=プラカップ）
+function effImg(it) { return (mode === "dinein" && it.imgDineIn) ? it.imgDineIn : it.img; }
+function effDesc(it) { return (mode === "dinein" && it.descDineIn) ? it.descDineIn : it.desc; }
 
 // ---------- 商品詳細 ----------
 let detail = null; // {item, cut, pack, choice, toppings:Set, qty}
@@ -135,7 +139,7 @@ function allergyHtml(allergy) {
 }
 function descHtml(it) {
   if (!it.desc) return "";
-  const { main, allergy } = splitDesc(it.desc);
+  const { main, allergy } = splitDesc(effDesc(it));
   const long = it.desc.length > DESC_LIMIT;
   if (!long || detail.descOpen) {
     return `<div class="desc-block">${descParas(main)}${allergy ? allergyHtml(allergy) : ""}` +
@@ -156,7 +160,7 @@ function renderDetail() {
   const it = detail.item;
   let html = `
     <div class="card" style="padding:0;overflow:hidden;">
-      ${it.img ? `<img src="${esc(it.img)}" alt="${esc(it.name)}" style="${it.poster ? "width:100%;aspect-ratio:3/4;object-fit:contain;background:#f6efe3;display:block;" : mode === "frozen" ? "width:100%;aspect-ratio:4/3;object-fit:contain;background:#f6efe3;display:block;" : "width:100%;aspect-ratio:1/1;object-fit:cover;display:block;"}">` : ""}
+      ${effImg(it) ? `<img src="${esc(effImg(it))}" alt="${esc(it.name)}" style="${it.poster ? "width:100%;aspect-ratio:3/4;object-fit:contain;background:#f6efe3;display:block;" : mode === "frozen" ? "width:100%;aspect-ratio:4/3;object-fit:contain;background:#f6efe3;display:block;" : "width:100%;aspect-ratio:1/1;object-fit:cover;display:block;"}">` : ""}
       <div style="padding:14px;">
         <div style="font-size:20px;font-weight:900;">${esc(it.name)}${it.seasonal ? ` <span class="season-badge">季節メニュー</span>` : ""}</div>
         ${descHtml(it)}
