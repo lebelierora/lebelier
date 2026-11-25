@@ -133,3 +133,11 @@ body.frozen .item .noimg{aspect-ratio:4/3;}
 
 /* 冷凍予約の保冷バッグ持参のお願い（目立つバナー） */
 .frozen-banner{background:#fff4e0;border:2px solid #e07b00;border-radius:12px;padding:12px 14px;margin:0 0 12px;font-size:16px;font-weight:700;line-height:1.5;color:#7a3e00;}
+
+/* 遊び心（色と形のみ・本人選択 2026-11-25） */
+.tricolor{height:6px;background:linear-gradient(90deg,#1e8449 0 33.4%,#fdf6ec 33.4% 66.7%,#c0392b 66.7% 100%);}
+.gingham{height:12px;background-color:#fff;background-image:repeating-linear-gradient(0deg,rgba(192,57,43,.28) 0 6px,rgba(192,57,43,0) 6px 12px),repeating-linear-gradient(90deg,rgba(192,57,43,.28) 0 6px,rgba(192,57,43,0) 6px 12px);border-bottom:2px solid var(--line);}
+#scr-home .btn{border-radius:999px;box-shadow:0 3px 0 rgba(59,42,30,.25);}
+#scr-home .btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(59,42,30,.25);}
+#scr-home h2{display:inline-block;padding:0 8px;background:linear-gradient(transparent 62%,#ffe08a 62%);}
+.card,.item{box-shadow:0 2px 6px rgba(59,42,30,.07);}
