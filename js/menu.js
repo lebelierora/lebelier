@@ -25,6 +25,7 @@ export const CATEGORIES = [
 // toppings: [{label, delta}] チェックボックス式。delta は1個あたりの加算額（円）。
 //   dineInOnly: true のトッピングは店内（イートイン）でのみ表示する（テイクアウトでは出さない）。
 //   スイーツピザ6品の「バニラアイス +150円」が該当（本人指示 2026-11-25）。
+//   商品自体の dineInOnly: true も同じ扱い（店内メニューにだけ出す商品。角ハイボールが該当、本人指示 2026-11-25）。
 // choice: {label, options:[{label, delta}]} 単一選択（必須・未選択スタート）。
 //   詳細画面で選ぶまで「カートに入れる」は押せない。
 //   選択した choice のラベルは注文データに保存され、厨房・お客側の両方に表示される。
@@ -114,6 +115,7 @@ export const MENU = [
   { id: "aperol-soda", cat: "alcohol", name: "アペロールソーダ", img: "images/aperol-soda.jpg", price: 500, desc: "柑橘類とハーブを使ったお酒です。爽やかな柑橘の香りと、すっきりとした味わいが楽しめます。最初の一杯にもおすすめです♪ プラカップで提供致します。", toppings: [] },
   { id: "oharaki", cat: "alcohol", name: "邑楽館林の地酒 於波良岐（おはらき）", img: "images/oharaki.jpg", price: 500, desc: "プラカップで提供致します。", toppings: [] },
   { id: "campari-beer", cat: "alcohol", name: "カンパリビア", img: "images/campari-beer.jpg", price: 700, desc: "キリンハートランド生ビールにカンパリを合わせたお酒です。プラカップで提供致します。", toppings: [] },
+  { id: "highball", cat: "alcohol", name: "角ハイボール", price: 500, desc: "定番ハイボール", dineInOnly: true, toppings: [] },
   { id: "hot-wine", cat: "alcohol", name: "ホットワイン", img: "images/hot-wine.jpg", price: 500, desc: "テイクアウト用コーヒーカップで提供致します。", choice: { label: "赤／白をお選びください", options: [{ label: "赤ワインベース", delta: 0 }, { label: "白ワインベース", delta: 0 }] }, toppings: [] },
   // ---- スイーツ ----
   { id: "apple-caramel-parfait", cat: "sweets", name: "りんごとキャラメルのミニパフェ", price: 600, desc: "", toppings: [] },
