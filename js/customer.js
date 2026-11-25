@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js?v=20251125-36";
+import { db } from "./firebase-config.js?v=20251125-37";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,10 +7,10 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js?v=20251125-36";
+} from "./menu.js?v=20251125-37";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
-} from "./frozen-menu.js?v=20251125-36";
+} from "./frozen-menu.js?v=20251125-37";
 
 // 焼きピザ・冷凍ピザ両方のメニューから商品を引く
 const anyById = id => menuById(id) || frozenById(id);
@@ -109,7 +109,7 @@ function effImg(it) {
   if (mode === "dinein" && NO_PHOTO_DINEIN_CATS.has(it.cat)) return ""; // 店内では写真自体を出さないカテゴリ
   return it.img;
 }
-function effDesc(it) { return (mode === "dinein" && it.descDineIn) ? it.descDineIn : it.desc; }
+function effDesc(it) { return (mode === "dinein" && it.descDineIn !== undefined) ? it.descDineIn : (it.desc || ""); }
 
 // ---------- 商品詳細 ----------
 let detail = null; // {item, cut, pack, choice, toppings:Set, qty}
