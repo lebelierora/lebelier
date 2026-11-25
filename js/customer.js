@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js?v=20251125-8";
+import { db } from "./firebase-config.js?v=20251125-9";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,7 +7,7 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js?v=20251125-8";
+} from "./menu.js?v=20251125-9";
 
 const $ = id => document.getElementById(id);
 const screens = ["scr-home", "scr-seat", "scr-order", "scr-detail", "scr-checkout", "scr-dinein", "scr-done", "scr-status"];
@@ -93,10 +93,48 @@ function openDetail(id) {
   const item = menuById(id);
   detail = { item, cut: "nocut", pack: "paper",
              choice: null, // choice は未選択スタート。選ぶまでカートに入れられない
-             toppings: new Set(), qty: 1 };
+             toppings: new Set(), qty: 1, descOpen: false };
   renderDetail();
   show("scr-detail");
 }
+// ---------- 商品説明の表示（詳細画面） ----------
+// desc は Airレジ全文。本文とアレルギー表示（特定原材料〜）に分け、
+// 長い場合は冒頭だけ見せて「さらに表示する」で全文に展開する（Airレジと同じ方式）。
+const DESC_LIMIT = 120;   // この字数を超えたら折りたたむ
+const DESC_PREVIEW = 80;  // 折りたたみ時に見せる冒頭の目安字数
+function splitDesc(desc) {
+  const m = desc.match(/・?\s*特定原材料/);
+  if (!m) return { main: desc, allergy: "" };
+  return {
+    main: desc.slice(0, m.index).replace(/[・\s]+$/, ""),
+    allergy: desc.slice(m.index).replace(/^・\s*/, ""),
+  };
+}
+function descParas(text) {
+  return text.split(/(?<=。)/).map(s => s.trim()).filter(Boolean)
+    .map(s => `<p class="desc-p">${esc(s)}</p>`).join("");
+}
+function allergyHtml(allergy) {
+  const parts = allergy.split(/(?=※)/).map(s => s.trim()).filter(Boolean);
+  return `<div class="desc-allergy">${parts.map(p => `<p>${esc(p)}</p>`).join("")}</div>`;
+}
+function descHtml(it) {
+  if (!it.desc) return "";
+  const { main, allergy } = splitDesc(it.desc);
+  const long = it.desc.length > DESC_LIMIT;
+  if (!long || detail.descOpen) {
+    return `<div class="desc-block">${descParas(main)}${allergy ? allergyHtml(allergy) : ""}` +
+      (long ? `<button type="button" class="desc-toggle" id="desc-toggle">閉じる</button>` : "") + `</div>`;
+  }
+  // 折りたたみ時：文の区切りを崩さず、目安字数までの文だけ見せる
+  const sentences = main.split(/(?<=。)/).map(s => s.trim()).filter(Boolean);
+  const shown = [];
+  let len = 0;
+  for (const s of sentences) { shown.push(s); len += s.length; if (len >= DESC_PREVIEW) break; }
+  return `<div class="desc-block">${shown.map(s => `<p class="desc-p">${esc(s)}</p>`).join("")}` +
+    `<button type="button" class="desc-toggle" id="desc-toggle">さらに表示する</button></div>`;
+}
+
 function hasCutPack(item) { return CUT_PACK_CATS.includes(item.cat); }
 function detailUnit() { return unitPrice(detail.item, [...detail.toppings], detail.pack, detail.choice); }
 function renderDetail() {
@@ -106,7 +144,7 @@ function renderDetail() {
       ${it.img ? `<img src="${esc(it.img)}" alt="${esc(it.name)}" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;">` : ""}
       <div style="padding:14px;">
         <div style="font-size:20px;font-weight:900;">${esc(it.name)}${it.seasonal ? ` <span class="season-badge">季節メニュー</span>` : ""}</div>
-        ${it.desc ? `<div class="note" style="margin-top:4px;">${esc(it.desc)}</div>` : ""}
+        ${descHtml(it)}
         <div style="font-weight:900;font-size:19px;margin-top:8px;">${yen(it.price)}</div>
       </div>
     </div>`;
@@ -169,6 +207,8 @@ function renderDetail() {
     const boxBtn = $("pack-box");
     if (boxBtn && !boxBtn.disabled) boxBtn.addEventListener("click", () => { detail.pack = "box"; detail.cut = "nocut"; renderDetail(); });
   }
+  const descToggle = $("desc-toggle");
+  if (descToggle) descToggle.addEventListener("click", () => { detail.descOpen = !detail.descOpen; renderDetail(); });
   $("detail-body").querySelectorAll("[data-choice]").forEach(b =>
     b.addEventListener("click", () => { detail.choice = b.dataset.choice; renderDetail(); }));
   $("detail-body").querySelectorAll("[data-top]").forEach(cb =>
