@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js?v=20251125-23";
+import { db } from "./firebase-config.js?v=20251125-24";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,10 +7,10 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js?v=20251125-23";
+} from "./menu.js?v=20251125-24";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
-} from "./frozen-menu.js?v=20251125-23";
+} from "./frozen-menu.js?v=20251125-24";
 
 // 焼きピザ・冷凍ピザ両方のメニューから商品を引く
 const anyById = id => menuById(id) || frozenById(id);
@@ -50,6 +50,8 @@ function setMode(m) {
   mode = m;
   cart = carts[m];
   document.body.classList.toggle("frozen", m === "frozen");
+  $("frozen-banner").classList.toggle("hidden", m !== "frozen");
+  $("frozen-banner2").classList.toggle("hidden", m !== "frozen");
   updateHeader();
   updateCartbar(false);
 }
@@ -439,7 +441,7 @@ function showDone(docId, orderNo) {
     if (!snap.exists()) return;
     const o = snap.data();
     let html = `<div class="card" style="text-align:center;">`;
-    if (o.kind === "frozen") html += `<p class="note" style="font-weight:900;font-size:16px;">冷凍ピザの店頭予約</p>`;
+    if (o.kind === "frozen") html += `<p class="note" style="font-weight:900;font-size:16px;">冷凍ピザの店頭予約</p><div class="frozen-banner">🧊 ご来店の際は、保冷バッグと保冷剤をご持参ください（冷凍ピザのお持ち帰り用です）</div>`;
     if (o.status === "pending") {
       html += `<div style="font-size:40px;">⌛</div>
         <h2 style="margin:8px 0;">お店の確認待ちです。確定までお待ちください</h2>

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>るべりえ 注文サイト</title>
-<link rel="stylesheet" href="css/style.css?v=20251125-23">
+<link rel="stylesheet" href="css/style.css?v=20251125-24">
 </head>
 <body>
 <header class="top">
@@ -55,7 +55,7 @@
           <span class="guide-arrow">▾</span>
         </button>
         <div class="guide-body hidden">
-          <p>冷凍ピザは店頭での受け取り予約ができます。ご用意に時間がかかるため、受け取りは翌々日から1週間先まででお願いしています。当日・翌日にご希望の場合は、お電話でご相談ください（できる日はお電話でお受けします）。店頭の冷凍自販機の商品は24時間いつでもその場で買えますので、このページには載せていません。</p>
+          <p>冷凍ピザは店頭での受け取り予約ができます。ご用意に時間がかかるため、受け取りは翌々日から1週間先まででお願いしています。当日・翌日にご希望の場合は、お電話でご相談ください（できる日はお電話でお受けします）。店頭の冷凍自販機の商品は24時間いつでもその場で買えますので、このページには載せていません。ご来店の際は、保冷バッグと保冷剤をご持参ください。</p>
         </div>
       </div>
       <div class="guide-item">
@@ -102,6 +102,7 @@
       <button class="btn" id="call-btn-order" style="margin-top:12px;">店員を呼ぶ</button>
       <p class="note" id="call-msg-order" style="margin:8px 0 0;"></p>
     </div>
+    <div id="frozen-banner" class="frozen-banner hidden">🧊 ご来店の際は、保冷バッグと保冷剤をご持参ください（冷凍ピザのお持ち帰り用です）</div>
     <div class="tabs" id="cat-tabs"></div>
     <div class="grid" id="item-grid"></div>
   </section>
@@ -116,6 +117,7 @@
   <section id="scr-checkout" class="hidden">
     <button class="btn ghost small" id="checkout-back">← メニューに戻る</button>
     <h2 style="margin:14px 0 6px;">カート</h2>
+    <div id="frozen-banner2" class="frozen-banner hidden">🧊 ご来店の際は、保冷バッグと保冷剤をご持参ください（冷凍ピザのお持ち帰り用です）</div>
     <div class="card" id="cart-list"></div>
     <h2 style="margin:18px 0 6px;">受け取り日時</h2>
     <div class="field">
@@ -211,6 +213,6 @@
 <!-- 通知帯（タップを遮らない） -->
 <div class="toast" id="toast"></div>
 
-<script type="module" src="js/customer.js?v=20251125-23"></script>
+<script type="module" src="js/customer.js?v=20251125-24"></script>
 </body>
 </html>

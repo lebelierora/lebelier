@@ -130,3 +130,6 @@ main{max-width:720px;margin:0 auto;padding:14px 14px 120px;}
 /* 冷凍モードは横長写真を切らずに全体表示する */
 body.frozen .item img{aspect-ratio:4/3;object-fit:contain;background:#f6efe3;}
 body.frozen .item .noimg{aspect-ratio:4/3;}
+
+/* 冷凍予約の保冷バッグ持参のお願い（目立つバナー） */
+.frozen-banner{background:#fff4e0;border:2px solid #e07b00;border-radius:12px;padding:12px 14px;margin:0 0 12px;font-size:16px;font-weight:700;line-height:1.5;color:#7a3e00;}
