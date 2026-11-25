@@ -127,7 +127,7 @@ export const MENU = [
   { id: "aperol-soda", cat: "alcohol", name: "アペロールソーダ", img: "images/aperol-soda.jpg", price: 500, desc: "柑橘類とハーブを使ったお酒です。爽やかな柑橘の香りと、すっきりとした味わいが楽しめます。最初の一杯にもおすすめです♪ プラカップで提供致します。", descDineIn: "柑橘類とハーブを使ったお酒です。爽やかな柑橘の香りと、すっきりとした味わいが楽しめます。最初の一杯にもおすすめです♪", toppings: [] },
   { id: "oharaki", cat: "alcohol", name: "邑楽館林の地酒 於波良岐（おはらき）", img: "images/oharaki.jpg", price: 500, desc: "プラカップで提供致します。", descDineIn: "", toppings: [] },
   { id: "campari-beer", cat: "alcohol", name: "カンパリビア", img: "images/campari-beer.jpg", price: 700, desc: "キリンハートランド生ビールにカンパリを合わせたお酒です。プラカップで提供致します。", descDineIn: "キリンハートランド生ビールにカンパリを合わせたお酒です。", toppings: [] },
-  { id: "highball", cat: "alcohol", name: "角ハイボール", price: 500, desc: "定番ハイボール", dineInOnly: true, toppings: [] },
+  { id: "highball", cat: "alcohol", name: "角ハイボール", img: "images/highball.jpg", price: 500, desc: "定番ハイボール", dineInOnly: true, toppings: [] },
   { id: "hot-wine", cat: "alcohol", name: "ホットワイン", img: "images/hot-wine.jpg", price: 500, desc: "テイクアウト用コーヒーカップで提供致します。", descDineIn: "", choice: { label: "赤／白をお選びください", options: [{ label: "赤ワインベース", delta: 0 }, { label: "白ワインベース", delta: 0 }] }, toppings: [] },
   { id: "wee-bee", cat: "alcohol", name: "ウィービー", img: "images/wee-bee.jpg", price: 700, desc: "ハートランド×角ウイスキー。ハートランドの爽やかさに、角ウイスキーのコクをプラス。祖父がよく飲んでいた一杯。", dineInOnly: true, poster: true, toppings: [] },
   { id: "bottle-beer", cat: "alcohol", name: "キリンハートランド瓶ビール", price: 700, desc: "キリンハートランドの瓶ビール。", dineInOnly: true, toppings: [] },
