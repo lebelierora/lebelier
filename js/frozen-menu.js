@@ -29,24 +29,24 @@ const CHEESE2 = delta => ({
 
 export const FROZEN_MENU = [
   // ---- セット ----
-  { id: "fz-gokumi", cat: "fz-set", name: "るべりえ極みセット", price: 6786, img: "images/fz-gokumi.jpg",
+  { id: "fz-gokumi", cat: "fz-set", name: "るべりえ極みセット", price: 6780, img: "images/fz-gokumi.jpg",
     desc: "ホールピザ（燻製チーズのマルゲリータ・るべりえミックス・カリカリベーコーン）、揚げピザ（プレミアムバジルチキン・プレミアムじゃがチーズ・太陽のトマトカレー）、スイーツピザ（マスカルポーネミックスベリー・レモンバターシュガー）、スイーツ揚げピザ（チョコバナナッツ・マスカルあんバター）、惣菜（もつトマト煮込み・ゼッポレ×2・るべりえクリスピーチキン）のセットです。" },
-  { id: "fz-variety", cat: "fz-set", name: "るべりえバラエティーセット", price: 4256, img: "images/fz-variety.jpg",
+  { id: "fz-variety", cat: "fz-set", name: "るべりえバラエティーセット", price: 4250, img: "images/fz-variety.jpg",
     desc: "ホールピザ（マルゲリータ・るべりえミックス）、揚げピザ（群馬ジルチキン・群馬トロフロマッジ）、スイーツピザ（マスカルポーネミックスベリー）、スイーツ揚げピザ（マスカルあんバター）、惣菜（もつトマト煮込み・ゼッポレ×2）のセットです。" },
-  { id: "fz-wagahai", cat: "fz-set", name: "WAGAHAIが選ぶ‼︎お勧めピザ三選", price: 1323, img: "images/fz-wagahai.jpg", seasonal: true,
+  { id: "fz-wagahai", cat: "fz-set", name: "WAGAHAIが選ぶ‼︎お勧めピザ三選", price: 1320, img: "images/fz-wagahai.jpg", seasonal: true,
     desc: "邑楽白菜のオルトラーナ・群馬ルゲリータ・群馬ジルチキンの3種セットです。白菜が終わり次第終了します。" },
-  { id: "fz-karisome", cat: "fz-set", name: "マツコ&有吉 かりそめ天国で紹介されましたセット", price: 1705, img: "images/fz-karisome.jpg", seasonal: true,
+  { id: "fz-karisome", cat: "fz-set", name: "マツコ&有吉 かりそめ天国で紹介されましたセット", price: 1700, img: "images/fz-karisome.jpg", seasonal: true,
     desc: "邑楽白菜のオルトラーナ・無花果アトロフロマッジ・群馬ルゲリータの3種セットです。白菜が終わり次第終了します。" },
   { id: "fz-hall3", cat: "fz-set", name: "ホールピザ3種セット", price: 1750, img: "images/fz-hall3.jpg",
     desc: "マルゲリータ・るべりえミックス・クアトロフロマッジの3枚セットです。店頭の冷凍自販機と同じ価格です。" },
   { id: "fz-age3", cat: "fz-set", name: "揚げピザ3種セット", price: 1200, img: "images/fz-age3.jpg",
     desc: "群馬ルゲリータ・群馬ジルチキン・群馬トロフロマッジの3個セットです。店頭の冷凍自販機と同じ価格です。" },
-  { id: "fz-rugerita-only", cat: "fz-set", name: "群馬ルゲリータだけセット", price: 2565, img: "images/fz-rugerita-only.jpg",
+  { id: "fz-rugerita-only", cat: "fz-set", name: "群馬ルゲリータだけセット", price: 2560, img: "images/fz-rugerita-only.jpg",
     desc: "群馬県産小麦100%使用のマルゲリータの揚げピザ、6個入り（1個約150g）です。",
-    choice: CHEESE2(855) },
-  { id: "fz-jiru-only", cat: "fz-set", name: "群馬ジルチキンだけセット", price: 2565, img: "images/fz-gunma-jiru.jpg",
+    choice: CHEESE2(860) },
+  { id: "fz-jiru-only", cat: "fz-set", name: "群馬ジルチキンだけセット", price: 2560, img: "images/fz-gunma-jiru.jpg",
     desc: "群馬県産小麦100%使用のバジルチキンの揚げピザ、6個入りです。このページだけのオリジナルセットです。" },
-  { id: "fz-toro-only", cat: "fz-set", name: "群馬トロフロマッジだけセット", price: 2565, img: "images/fz-gunma-toro.jpg",
+  { id: "fz-toro-only", cat: "fz-set", name: "群馬トロフロマッジだけセット", price: 2560, img: "images/fz-gunma-toro.jpg",
     desc: "群馬県産小麦100%使用のクアトロフロマッジの揚げピザ、6個入りです。このページだけのオリジナルセットです。" },
 
   // ---- 冷凍ホールピザ ----
