@@ -31,12 +31,12 @@ main{max-width:720px;margin:0 auto;padding:14px 14px 120px;}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 @media (max-width:420px){.grid{grid-template-columns:1fr 1fr;gap:9px;}}
 .item{background:var(--card);border:2px solid var(--line);border-radius:16px;overflow:hidden;text-align:left;padding:0;width:100%;}
-.item img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#eee;}
+.item img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;background:#eee;}
 .item .body{padding:10px 12px 12px;}
 .item .name{font-weight:800;font-size:16px;line-height:1.35;}
 .item .desc{font-size:12px;color:var(--muted);line-height:1.5;margin-top:4px;min-height:3em;}
 .item .price{font-weight:800;font-size:17px;margin-top:6px;color:var(--red-dark);}
-.item .noimg{width:100%;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;background:#f0e7d8;color:var(--muted);font-weight:700;font-size:14px;}
+.item .noimg{width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:#f0e7d8;color:var(--muted);font-weight:700;font-size:14px;}
 .season-badge{display:inline-block;background:#e67e22;color:#fff;font-size:11px;font-weight:800;border-radius:999px;padding:1px 8px;vertical-align:middle;}
 
 /* 商品説明（詳細画面のみ。一覧グリッドは従来どおり） */
