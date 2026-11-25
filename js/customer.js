@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js<<?v=20251125-32";
+import { db } from "./firebase-config.js<<?v=20251125-33";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,10 +7,10 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js<<?v=20251125-32";
+} from "./menu.js<<?v=20251125-33";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
-} from "./frozen-menu.js<<?v=20251125-32";
+} from "./frozen-menu.js<<?v=20251125-33";
 
 // 焼きピザ・冷凍ピザ両方のメニューから商品を引く
 const anyById = id => menuById(id) || frozenById(id);
@@ -193,10 +193,11 @@ function renderDetail() {
     </div>`;
     }
   }
-  if (it.choice) {
+  const choiceVisible = it.choice && (mode === "dinein" || !it.choice.dineInOnly); // dineInOnly の choice は店内のみ（例：生ビールの小サイズ）
+  if (choiceVisible) {
     html += `<div class="opt-group"><div class="label">${esc(it.choice.label)}</div><div class="opt-row">` +
       it.choice.options.map(o => `
-        <button data-choice="${esc(o.label)}" class="${detail.choice === o.label ? "active" : ""}">${esc(o.label)}${o.delta ? ` <span style="color:var(--red-dark);">+${yen(o.delta)}</span>` : ""}</button>`).join("") +
+        <button data-choice="${esc(o.label)}" class="${detail.choice === o.label ? "active" : ""}">${esc(o.label)}${o.delta ? ` <span style="color:var(--red-dark);">${o.delta > 0 ? "+" : "−"}${yen(Math.abs(o.delta))}</span>` : ""}</button>`).join("") +
       `</div>${detail.choice ? "" : `<div class="opt-note">お選びください（必須）</div>`}</div>`;
   }
   // dineInOnly のトッピングは店内モードでのみ表示する（テイクアウトでは出さない）
@@ -215,7 +216,7 @@ function renderDetail() {
         <button id="qty-minus">−</button><div class="qty">${detail.qty}</div><button id="qty-plus">＋</button>
       </div>
     </div>
-    <button class="btn" id="add-cart" ${it.choice && !detail.choice ? "disabled" : ""}>${it.choice && !detail.choice ? esc(it.choice.label) : `カートに入れる　${yen(detailUnit() * detail.qty)}`}</button>`;
+    <button class="btn" id="add-cart" ${choiceVisible && !detail.choice ? "disabled" : ""}>${choiceVisible && !detail.choice ? esc(it.choice.label) : `カートに入れる　${yen(detailUnit() * detail.qty)}`}</button>`;
   $("detail-body").innerHTML = html;
 
   if (hasCutPack(it)) {
@@ -235,7 +236,7 @@ function renderDetail() {
   $("qty-minus").addEventListener("click", () => { if (detail.qty > 1) detail.qty--; renderDetail(); });
   $("qty-plus").addEventListener("click", () => { if (detail.qty < MAX_QTY) detail.qty++; renderDetail(); });
   $("add-cart").addEventListener("click", () => {
-    if (it.choice && !detail.choice) return; // 念のため：未選択では追加しない
+    if (it.choice && (mode === "dinein" || !it.choice.dineInOnly) && !detail.choice) return; // 念のため：未選択では追加しない
     cart.push({ itemId: it.id, qty: detail.qty, cut: hasCutPack(it) ? detail.cut : null,
                 pack: hasCutPack(it) && mode === "takeout" ? detail.pack : null,
                 choice: detail.choice, toppings: [...detail.toppings] });

@@ -121,7 +121,7 @@ export const MENU = [
   { id: "peche-oolong", cat: "drink", name: "ペシェウーロン（桃味）", img: "images/peche-oolong.jpg", price: 400, desc: "ピーチシロップを烏龍茶で割った飲み物です。", toppings: [{ label: "バニラアイストッピング", delta: 100 }] },
   { id: "tropical-oolong", cat: "drink", name: "トロピカルウーロン（パッション味）", img: "images/tropical-oolong.jpg", price: 400, desc: "パッションシロップを烏龍茶で割った飲み物です。", toppings: [{ label: "バニラアイストッピング", delta: 100 }] },
   // ---- アルコール ----
-  { id: "heartland-draft", cat: "alcohol", name: "キリンハートランド生ビール", img: "images/heartland-draft.jpg", price: 600, desc: "プラカップで提供致します。", imgDineIn: "images/heartland-draft-dinein.jpg", descDineIn: "ゴブレットで提供致します。", toppings: [] },
+  { id: "heartland-draft", cat: "alcohol", name: "キリンハートランド生ビール", img: "images/heartland-draft.jpg", price: 600, desc: "プラカップで提供致します。", imgDineIn: "images/heartland-draft-dinein.jpg", descDineIn: "ゴブレットで提供致します。", choice: { label: "サイズをお選びください", dineInOnly: true, options: [{ label: "通常", delta: 0 }, { label: "小（ちビール）", delta: -110 }] }, toppings: [] },
   { id: "house-wine", cat: "alcohol", name: "ハウスワイン", img: "images/house-wine.jpg", price: 500, desc: "プラカップで提供致します。", choice: { label: "赤／白をお選びください", options: [{ label: "赤ワイン", delta: 0 }, { label: "白ワイン", delta: 0 }] }, toppings: [] },
   { id: "sangria", cat: "alcohol", name: "なんちゃってサングリア", img: "images/sangria.jpg", price: 500, desc: "ワインを柑橘類で割った、爽やかなサングリア。フルーツの香りとワインの風味を楽しめる、すっきり飲みやすい一杯です。赤・白の2種類からお選びいただけます。プラカップで提供致します。", choice: { label: "赤／白をお選びください", options: [{ label: "赤ワインベース", delta: 0 }, { label: "白ワインベース", delta: 0 }] }, toppings: [] },
   { id: "aperol-soda", cat: "alcohol", name: "アペロールソーダ", img: "images/aperol-soda.jpg", price: 500, desc: "柑橘類とハーブを使ったお酒です。爽やかな柑橘の香りと、すっきりとした味わいが楽しめます。最初の一杯にもおすすめです♪ プラカップで提供致します。", toppings: [] },
@@ -130,7 +130,6 @@ export const MENU = [
   { id: "highball", cat: "alcohol", name: "角ハイボール", price: 500, desc: "定番ハイボール", dineInOnly: true, toppings: [] },
   { id: "hot-wine", cat: "alcohol", name: "ホットワイン", img: "images/hot-wine.jpg", price: 500, desc: "テイクアウト用コーヒーカップで提供致します。", choice: { label: "赤／白をお選びください", options: [{ label: "赤ワインベース", delta: 0 }, { label: "白ワインベース", delta: 0 }] }, toppings: [] },
   { id: "wee-bee", cat: "alcohol", name: "ウィービー", img: "images/wee-bee.jpg", price: 700, desc: "ハートランド×角ウイスキー。ハートランドの爽やかさに、角ウイスキーのコクをプラス。祖父がよく飲んでいた一杯。", dineInOnly: true, poster: true, toppings: [] },
-  { id: "chibi-beer", cat: "alcohol", name: "ちビール（ハートランド生ビール・小）", img: "images/chibi-beer.jpg", price: 490, desc: "ハートランド生ビールの小サイズ。", dineInOnly: true, toppings: [] },
   { id: "bottle-beer", cat: "alcohol", name: "キリンハートランド瓶ビール", price: 700, desc: "キリンハートランドの瓶ビール。", dineInOnly: true, toppings: [] },
   { id: "bottle-wine", cat: "alcohol", name: "ボトルワイン", price: 1800, desc: "ボトルワインです。赤・白からお選びください。", dineInOnly: true, choice: { label: "赤／白をお選びください", options: [{ label: "赤ワイン", delta: 0 }, { label: "白ワイン", delta: 0 }] }, toppings: [] },
   { id: "sparkling-wine", cat: "alcohol", name: "スパークリングワイン", price: 2900, desc: "スパークリングワイン（ボトル）。", dineInOnly: true, toppings: [] },
