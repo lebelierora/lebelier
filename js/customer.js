@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js?v=20251125-7";
+import { db } from "./firebase-config.js?v=20251125-8";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,7 +7,7 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js?v=20251125-7";
+} from "./menu.js?v=20251125-8";
 
 const $ = id => document.getElementById(id);
 const screens = ["scr-home", "scr-seat", "scr-order", "scr-detail", "scr-checkout", "scr-dinein", "scr-done", "scr-status"];
@@ -142,9 +142,11 @@ function renderDetail() {
         <button data-choice="${esc(o.label)}" class="${detail.choice === o.label ? "active" : ""}">${esc(o.label)}${o.delta ? ` <span style="color:var(--red-dark);">+${yen(o.delta)}</span>` : ""}</button>`).join("") +
       `</div>${detail.choice ? "" : `<div class="opt-note">お選びください（必須）</div>`}</div>`;
   }
-  if ((it.toppings || []).length) {
+  // dineInOnly のトッピングは店内モードでのみ表示する（テイクアウトでは出さない）
+  const visibleToppings = (it.toppings || []).filter(t => mode === "dinein" || !t.dineInOnly);
+  if (visibleToppings.length) {
     html += `<div class="opt-group"><div class="label">トッピング・変更</div><div class="check-row">` +
-      it.toppings.map(t => `
+      visibleToppings.map(t => `
         <label><span>${esc(t.label)}${t.delta ? ` <span style="color:var(--red-dark);">+${yen(t.delta)}</span>` : ""}</span>
         <input type="checkbox" data-top="${esc(t.label)}" ${detail.toppings.has(t.label) ? "checked" : ""}></label>`).join("") +
       `</div></div>`;

@@ -22,6 +22,8 @@ export const CATEGORIES = [
 // noBox: 箱を選べない商品（レモンバターシュガー）
 // seasonal: 季節メニュー（仮想カテゴリ）にも表示する商品
 // toppings: [{label, delta}] チェックボックス式。delta は1個あたりの加算額（円）。
+//   dineInOnly: true のトッピングは店内（イートイン）でのみ表示する（テイクアウトでは出さない）。
+//   スイーツピザ6品の「バニラアイス +150円」が該当（本人指示 2026-11-25）。
 // choice: {label, options:[{label, delta}]} 単一選択（必須・未選択スタート）。
 //   詳細画面で選ぶまで「カートに入れる」は押せない。
 //   選択した choice のラベルは注文データに保存され、厨房・お客側の両方に表示される。
@@ -67,12 +69,12 @@ export const MENU = [
   { id: "premium-basil-chicken", cat: "age", name: "プレミアムバジルチキン", price: 500, desc: "スモークチキン・バジルペースト・フランス産マスタード", img: "https://imagedelivery.net/QondspN4HIUvB_R16-ddAQ/63e43a8bf54f677c995609ab/cdbfb07352ce1ba4149b.jpeg/fit=cover,w=924,h=660", toppings: [] },
   { id: "premium-jaga-cheese", cat: "age", name: "プレミアムじゃがチーズ", price: 500, desc: "5種のチーズとじゃがいも。るべりえ名物", img: "https://imagedelivery.net/QondspN4HIUvB_R16-ddAQ/63e43a8bf54f677c995609ab/004dfc8fe98814cb2894.jpeg/fit=cover,w=924,h=660", toppings: [] },
   // ---- スイーツピザ ----
-  { id: "lemon-butter-sugar", cat: "sweetpizza", name: "レモンバターシュガー", price: 550, desc: "バター・グラニュー糖・レモンのさっぱりした甘さ", noBox: true, img: "https://imagedelivery.net/QondspN4HIUvB_R16-ddAQ/63e43a8bf54f677c995609ab/50c568275bf2efbacd53.jpeg/fit=cover,w=924,h=660", toppings: [{ label: "邑楽町産ハチミツ", delta: 100 }] },
-  { id: "mascarpone-berry", cat: "sweetpizza", name: "マスカルポーネとミックスベリー", price: 680, desc: "マスカルポーネとミックスベリー、自家製ベリーソース", img: "https://imagedelivery.net/QondspN4HIUvB_R16-ddAQ/63e43a8bf54f677c995609ab/30e2d18b5cfc4243af93.jpeg/fit=cover,w=924,h=660", toppings: [{ label: "邑楽町産ハチミツ", delta: 100 }] },
-  { id: "banana-caramel", cat: "sweetpizza", name: "バナナキャラメル", price: 680, desc: "バナナとマスカルポーネ、自家製キャラメルソース", img: "https://imagedelivery.net/QondspN4HIUvB_R16-ddAQ/63e43a8bf54f677c995609ab/82a6fb67e08ff0b7fed1.jpeg/fit=cover,w=924,h=660", toppings: [{ label: "邑楽町産ハチミツ", delta: 100 }] },
-  { id: "tiramisu", cat: "sweetpizza", name: "るべりえティラミス", price: 680, desc: "マスカルポーネとコーヒーソースのティラミス風", img: "https://imagedelivery.net/QondspN4HIUvB_R16-ddAQ/63e43a8bf54f677c995609ab/273cb50594f19a984112.jpeg/fit=cover,w=924,h=660", toppings: [{ label: "邑楽町産ハチミツ", delta: 100 }] },
-  { id: "melty-bitter", cat: "sweetpizza", name: "メルティービター", price: 750, desc: "ビターチョコとミックスベリー", img: "https://imagedelivery.net/QondspN4HIUvB_R16-ddAQ/63e43a8bf54f677c995609ab/21ee74660d3e763933df.jpeg/fit=cover,w=924,h=660", toppings: [{ label: "邑楽町産ハチミツ", delta: 100 }] },
-  { id: "white-berry", cat: "sweetpizza", name: "ホワイトベリー", price: 750, desc: "ホワイトチョコとミックスベリー", img: "https://imagedelivery.net/QondspN4HIUvB_R16-ddAQ/63e43a8bf54f677c995609ab/0e0b6705bb51b58c2cbe.jpeg/fit=cover,w=924,h=660", toppings: [{ label: "邑楽町産ハチミツ", delta: 100 }] },
+  { id: "lemon-butter-sugar", cat: "sweetpizza", name: "レモンバターシュガー", price: 550, desc: "バター・グラニュー糖・レモンのさっぱりした甘さ", noBox: true, img: "https://imagedelivery.net/QondspN4HIUvB_R16-ddAQ/63e43a8bf54f677c995609ab/50c568275bf2efbacd53.jpeg/fit=cover,w=924,h=660", toppings: [{ label: "邑楽町産ハチミツ", delta: 100 }, { label: "バニラアイス", delta: 150, dineInOnly: true }] },
+  { id: "mascarpone-berry", cat: "sweetpizza", name: "マスカルポーネとミックスベリー", price: 680, desc: "マスカルポーネとミックスベリー、自家製ベリーソース", img: "https://imagedelivery.net/QondspN4HIUvB_R16-ddAQ/63e43a8bf54f677c995609ab/30e2d18b5cfc4243af93.jpeg/fit=cover,w=924,h=660", toppings: [{ label: "邑楽町産ハチミツ", delta: 100 }, { label: "バニラアイス", delta: 150, dineInOnly: true }] },
+  { id: "banana-caramel", cat: "sweetpizza", name: "バナナキャラメル", price: 680, desc: "バナナとマスカルポーネ、自家製キャラメルソース", img: "https://imagedelivery.net/QondspN4HIUvB_R16-ddAQ/63e43a8bf54f677c995609ab/82a6fb67e08ff0b7fed1.jpeg/fit=cover,w=924,h=660", toppings: [{ label: "邑楽町産ハチミツ", delta: 100 }, { label: "バニラアイス", delta: 150, dineInOnly: true }] },
+  { id: "tiramisu", cat: "sweetpizza", name: "るべりえティラミス", price: 680, desc: "マスカルポーネとコーヒーソースのティラミス風", img: "https://imagedelivery.net/QondspN4HIUvB_R16-ddAQ/63e43a8bf54f677c995609ab/273cb50594f19a984112.jpeg/fit=cover,w=924,h=660", toppings: [{ label: "邑楽町産ハチミツ", delta: 100 }, { label: "バニラアイス", delta: 150, dineInOnly: true }] },
+  { id: "melty-bitter", cat: "sweetpizza", name: "メルティービター", price: 750, desc: "ビターチョコとミックスベリー", img: "https://imagedelivery.net/QondspN4HIUvB_R16-ddAQ/63e43a8bf54f677c995609ab/21ee74660d3e763933df.jpeg/fit=cover,w=924,h=660", toppings: [{ label: "邑楽町産ハチミツ", delta: 100 }, { label: "バニラアイス", delta: 150, dineInOnly: true }] },
+  { id: "white-berry", cat: "sweetpizza", name: "ホワイトベリー", price: 750, desc: "ホワイトチョコとミックスベリー", img: "https://imagedelivery.net/QondspN4HIUvB_R16-ddAQ/63e43a8bf54f677c995609ab/0e0b6705bb51b58c2cbe.jpeg/fit=cover,w=924,h=660", toppings: [{ label: "邑楽町産ハチミツ", delta: 100 }, { label: "バニラアイス", delta: 150, dineInOnly: true }] },
   { id: "pacp", cat: "sweetpizza", name: "PACP（ピザアップルシナモンパイ風）", price: 750, desc: "", seasonal: true, toppings: [{ label: "シナモン抜き", delta: 0 }, { label: "邑楽町産ハチミツ", delta: 100 }] },
   // ---- キッズメニュー ----
   { id: "zeppole-kids", cat: "kids", name: "ゼッポレ塩無し", price: 330, desc: "", toppings: [] },
