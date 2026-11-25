@@ -5,7 +5,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice,
-  todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes,
+  todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
 } from "./menu.js";
 
@@ -57,12 +57,12 @@ function updateCartbar(pop) {
 }
 
 let toastTimer = null;
-function toast(msg) {
+function toast(msg, ms = 1200) {
   const t = $("toast");
   t.textContent = msg;
   t.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove("show"), 1200); // 1.2秒
+  toastTimer = setTimeout(() => t.classList.remove("show"), ms); // 既定は1.2秒
 }
 
 // ---------- メニュー ----------
@@ -175,6 +175,24 @@ function renderDetail() {
 // ---------- チェックアウト ----------
 let selDate = todayKey();
 let selTime = null;
+let occupiedTimes = new Set(); // 選択中の受け取り日に既に注文が入っている時刻（重複防止）
+let slotSub = null;            // 枠の埋まり状況の購読解除関数
+
+// 選択中の日の注文を購読し、埋まっている枠（1枠1注文）を即時に反映する
+function watchSlots() {
+  unwatchSlots();
+  occupiedTimes = new Set();
+  const q = query(collection(db, "takeoutOrders"), where("pickupDate", "==", selDate));
+  slotSub = onSnapshot(q, snap => {
+    occupiedTimes = occupiedSlots(snap.docs.map(d => d.data()), selDate);
+    if (selTime && occupiedTimes.has(selTime)) {
+      selTime = null;
+      toast("選択していた時刻が埋まりました");
+    }
+    renderSlots();
+  }, e => console.error(e));
+}
+function unwatchSlots() { if (slotSub) { slotSub(); slotSub = null; } }
 function dateChipList() {
   const list = [];
   for (let i = 0; i <= 7; i++) list.push(addDays(todayKey(), i).key);
@@ -225,16 +243,20 @@ function renderCart() {
 }
 function renderSlots() {
   const slots = timeSlots(selDate, cartQty());
-  if (selTime && !slots.includes(selTime)) selTime = null;
+  if (selTime && (!slots.includes(selTime) || occupiedTimes.has(selTime))) selTime = null;
   const lead = leadMinutes(cartQty());
   $("lead-note").textContent = selDate === todayKey()
     ? (cartQty() >= 5 ? `ご注文点数が多いため、最短で${lead}分後からの受け取りになります。` : `最短で${lead}分後からの受け取りになります。`)
     : "営業時間内（11:00〜最終受け取り 月〜土19:30／日曜17:30）でお選びください。";
-  $("slot-grid").innerHTML = slots.map(s =>
-    `<button data-slot="${s}" class="${s === selTime ? "active" : ""}">${s}</button>`).join("");
+  // 既に注文が入っている枠（1枠1注文）は選べないようにする
+  $("slot-grid").innerHTML = slots.map(s => {
+    const full = occupiedTimes.has(s);
+    return `<button data-slot="${s}" class="${s === selTime ? "active" : ""}" ${full ? "disabled" : ""}>${s}${full ? `<span class="full-label">受付終了</span>` : ""}</button>`;
+  }).join("");
   $("slot-empty").textContent = slots.length === 0
-    ? (isThursday(selDate) ? "木曜日は定休日です。別の日をお選びください。" : "本日の受け取り枠は終了しました。別の日をお選びください。") : "";
-  $("slot-grid").querySelectorAll("button").forEach(b =>
+    ? (isThursday(selDate) ? "木曜日は定休日です。別の日をお選びください。" : "本日の受け取り枠は終了しました。別の日をお選びください。")
+    : slots.every(s => occupiedTimes.has(s)) ? "この日の受け取り枠はすべて埋まっています。別の日をお選びください。" : "";
+  $("slot-grid").querySelectorAll("button:not(:disabled)").forEach(b =>
     b.addEventListener("click", () => { selTime = b.dataset.slot; renderSlots(); }));
 }
 function openCheckout() {
@@ -242,6 +264,7 @@ function openCheckout() {
   renderCart();
   renderDateChips($("date-chips"), selDate, pickDate);
   renderSlots();
+  watchSlots();
   const savedName = localStorage.getItem("ruberie_name") || "";
   const savedPhone = localStorage.getItem("ruberie_phone") || "";
   if (savedName) $("cust-name").value = savedName;
@@ -249,7 +272,7 @@ function openCheckout() {
   $("order-error").innerHTML = "";
   show("scr-checkout");
 }
-function pickDate(k) { selDate = k; selTime = null; renderDateChips($("date-chips"), selDate, pickDate); renderSlots(); }
+function pickDate(k) { selDate = k; selTime = null; renderDateChips($("date-chips"), selDate, pickDate); renderSlots(); watchSlots(); }
 
 // ---------- 注文送信 ----------
 function makeOrderNo() {
@@ -277,6 +300,14 @@ async function submitOrder() {
       btn.disabled = false; btn.textContent = "この内容で注文を送信する";
       return err("この番号でのご注文はお受けできません。お電話でご注文ください（0276-70-2321）");
     }
+    // 送信直前の重複チェック：同じ受け取り枠（1枠1注文）に別の注文が入っていないか再確認する
+    const sameDay = await getDocs(query(collection(db, "takeoutOrders"), where("pickupDate", "==", selDate)));
+    occupiedTimes = occupiedSlots(sameDay.docs.map(d => d.data()), selDate);
+    if (occupiedTimes.has(selTime)) {
+      btn.disabled = false; btn.textContent = "この内容で注文を送信する";
+      selTime = null; renderSlots();
+      return err("申し訳ありません。その受け取り時刻は別のご注文が入りました。別の時刻をお選びください。");
+    }
     const items = cart.map(c => {
       const it = menuById(c.itemId);
       const up = unitPrice(it, c.toppings, c.pack);
@@ -294,6 +325,7 @@ async function submitOrder() {
     localStorage.setItem("ruberie_name", name);
     localStorage.setItem("ruberie_phone", phone);
     cart.length = 0; updateCartbar(false);
+    unwatchSlots();
     showDone(ref.id, orderNo);
   } catch (e) {
     console.error(e);
@@ -515,10 +547,12 @@ async function callStaff(msgEl) {
       seat, seatLabel: seatLabel(seat), status: "open",
       createdAt: serverTimestamp(),
     });
-    msgEl.textContent = "店員を呼びました。お席でお待ちください。";
+    msgEl.textContent = "店員をお呼びしました。お席まで伺います。";
+    toast("店員をお呼びしました。お席まで伺います", 3500);
   } catch (e) {
     console.error(e);
     msgEl.textContent = "呼び出しに失敗しました。お近くの店員にお声がけください。";
+    toast("呼び出しに失敗しました。お近くの店員にお声がけください", 4000);
   }
   setTimeout(() => { callBusy = false; }, 3000);
 }
@@ -546,7 +580,7 @@ $("go-status").addEventListener("click", () => {
   show("scr-status");
 });
 $("detail-back").addEventListener("click", () => show("scr-order"));
-$("checkout-back").addEventListener("click", () => show("scr-order"));
+$("checkout-back").addEventListener("click", () => { unwatchSlots(); show("scr-order"); });
 $("status-back").addEventListener("click", () => show("scr-home"));
 $("done-home").addEventListener("click", () => {
   if (doneUnsub) doneUnsub();

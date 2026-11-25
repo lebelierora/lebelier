@@ -7,7 +7,7 @@ import {
   collection, onSnapshot, query, where, doc, updateDoc, setDoc, deleteDoc, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  todayKey, formatDateJP, lastSlot, toMin, toHHMM, esc, yen, seatLabel,
+  todayKey, formatDateJP, lastSlot, toMin, toHHMM, occupiedTime, esc, yen, seatLabel,
 } from "./menu.js";
 
 const $ = id => document.getElementById(id);
@@ -148,8 +148,16 @@ function adjRange(o) {
 }
 function proposedTime(o) {
   const base = toMin(o.requestedPickup);
+  // 時刻の調整は当日予約のみ。前日以前の予約は希望時刻のまま確定する。
+  if (o.pickupDate !== todayKey()) return base;
   const { low, high } = adjRange(o);
   return Math.min(high, Math.max(low, base + (adj[o.id] || 0)));
+}
+// 同じ日・同じ時刻に既にある別の有効な注文（確認待ち・確定）を返す。なければ null。
+// 厨房で当日の時刻を調整したときの重複警告に使う。
+function slotConflict(o, hhmm) {
+  return orders.find(x => x.id !== o.id && x.pickupDate === o.pickupDate
+    && (x.status === "pending" || x.status === "confirmed") && occupiedTime(x) === hhmm) || null;
 }
 function countdownText(o) {
   if (o.status !== "confirmed" || !o.confirmedPickup) return "";
@@ -276,7 +284,9 @@ function itemsHtml(o) {
 
 function cardHtml(o) {
   const isPending = o.status === "pending";
+  const isTodayPickup = o.pickupDate === todayKey(); // 時刻調整ができるのは当日予約だけ
   const prop = proposedTime(o);
+  const conflict = isPending && isTodayPickup ? slotConflict(o, toHHMM(prop)) : null;
   const diff = prop - toMin(o.requestedPickup);
   const diffHtml = diff === 0
     ? `<span class="note">希望通り</span>`
@@ -296,12 +306,16 @@ function cardHtml(o) {
     ${isPending ? `
     <div>
       <div class="kcustom">お客様の希望：${esc(o.requestedPickup)}</div>
+      ${isTodayPickup ? `
       <div style="font-weight:900;font-size:20px;">確定予定：${toHHMM(prop)} ${diffHtml}</div>
+      ${conflict ? `<div style="color:var(--warn);font-weight:900;font-size:17px;">⚠ ${toHHMM(prop)} には別の注文（${esc(conflict.name)} 様）が入っています</div>` : ""}
       <div class="adj-row" style="margin-top:8px;">
         <button data-adj="${o.id}|-5">−5分</button>
         <button data-fastest="${o.id}">最短</button>
         <button data-adj="${o.id}|5">＋5分</button>
-      </div>
+      </div>` : `
+      <div style="font-weight:900;font-size:20px;">確定予定：${esc(o.requestedPickup)} <span class="note">希望通り</span></div>
+      <div class="kcustom">前日以前のご予約は、希望時刻のまま受け付けます（時刻の調整は当日のご予約のみ）</div>`}
     </div>
     <div class="act-row">
       <button class="btn" data-accept="${o.id}">この時間で受付</button>

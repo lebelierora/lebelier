@@ -177,6 +177,20 @@ export function timeSlots(key, totalQty) {
   return slots;
 }
 
+// 注文が受け取り枠を占有する時刻（確定済みは確定時刻、それ以外は希望時刻）
+export function occupiedTime(o) {
+  return o.status === "confirmed" && o.confirmedPickup ? o.confirmedPickup : o.requestedPickup;
+}
+
+// 指定日に既に注文が入っている受け取り時刻の集合（重複防止用）。
+// 有効なのは「確認待ち（pending）」と「確定（confirmed）」のみ。
+// お渡し済み（done）・来店なし（noshow）は枠を占有しない。
+export function occupiedSlots(list, key) {
+  return new Set(list
+    .filter(o => o.pickupDate === key && (o.status === "pending" || o.status === "confirmed"))
+    .map(occupiedTime));
+}
+
 // 電話番号の正規化（数字のみ）
 export function normalizePhone(s) { return (s || "").replace(/[^0-9]/g, ""); }
 
