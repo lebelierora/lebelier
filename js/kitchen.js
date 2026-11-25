@@ -2,13 +2,13 @@
 // テスト段階の簡易保護として PIN ゲートを使う（本番前に Firebase Auth へ移行すること）。
 const KITCHEN_PIN = "2321"; // テスト用PIN（店の電話番号の下4桁）
 
-import { db } from "./firebase-config.js?v=20251125-5";
+import { db } from "./firebase-config.js?v=20251125-6";
 import {
   collection, onSnapshot, query, where, doc, updateDoc, setDoc, deleteDoc, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   todayKey, formatDateJP, lastSlot, toMin, toHHMM, occupiedTime, esc, yen, seatLabel,
-} from "./menu.js?v=20251125-5";
+} from "./menu.js?v=20251125-6";
 
 const $ = id => document.getElementById(id);
 
@@ -277,6 +277,7 @@ function itemsHtml(o) {
   return (o.items || []).map(i => {
     const custom = [i.cut ? (i.cut === "cut4" ? "4カット" : "未カット") : null,
                     i.pack ? (i.pack === "box" ? "箱" : "紙皿・ホイル") : null,
+                    i.choice || null,
                     ...(i.toppings || [])].filter(Boolean).join("／");
     return `<div><div class="kitem">${esc(i.name)} × ${i.qty}</div>${custom ? `<div class="kcustom">${esc(custom)}</div>` : ""}</div>`;
   }).join("");

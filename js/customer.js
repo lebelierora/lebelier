@@ -1,13 +1,13 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js?v=20251125-5";
+import { db } from "./firebase-config.js?v=20251125-6";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice,
+  CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js?v=20251125-5";
+} from "./menu.js?v=20251125-6";
 
 const $ = id => document.getElementById(id);
 const screens = ["scr-home", "scr-seat", "scr-order", "scr-detail", "scr-checkout", "scr-dinein", "scr-done", "scr-status"];
@@ -36,7 +36,7 @@ function updateHeader() {
 
 // ---------- カート ----------
 const carts = { takeout: [], dinein: [] }; // モードごとに分けて保持
-let cart = carts.takeout; // {itemId, qty, cut, pack, toppings:[label]}
+let cart = carts.takeout; // {itemId, qty, cut, pack, choice:label|null, toppings:[label]}
 function setMode(m) {
   mode = m;
   cart = carts[m];
@@ -45,7 +45,7 @@ function setMode(m) {
 }
 function cartQty() { return cart.reduce((a, c) => a + c.qty, 0); }
 function cartTotal() {
-  return cart.reduce((a, c) => a + unitPrice(menuById(c.itemId), c.toppings, c.pack) * c.qty, 0);
+  return cart.reduce((a, c) => a + unitPrice(menuById(c.itemId), c.toppings, c.pack, c.choice) * c.qty, 0);
 }
 function updateCartbar(pop) {
   const q = cartQty();
@@ -66,7 +66,7 @@ function toast(msg, ms = 1200) {
 }
 
 // ---------- メニュー ----------
-let currentCat = "hall";
+let currentCat = "seasonal";
 function renderTabs() {
   $("cat-tabs").innerHTML = CATEGORIES.map(c =>
     `<button data-cat="${c.id}" class="${c.id === currentCat ? "active" : ""}">${esc(c.name)}</button>`).join("");
@@ -74,13 +74,13 @@ function renderTabs() {
     b.addEventListener("click", () => { currentCat = b.dataset.cat; renderTabs(); renderGrid(); }));
 }
 function renderGrid() {
-  $("item-grid").innerHTML = MENU.filter(m => m.cat === currentCat).map(m => `
+  $("item-grid").innerHTML = itemsForCategory(currentCat).map(m => `
     <button class="item" data-id="${m.id}">
-      <img src="${esc(m.img)}" alt="${esc(m.name)}" loading="lazy">
+      ${m.img ? `<img src="${esc(m.img)}" alt="${esc(m.name)}" loading="lazy">` : `<div class="noimg">写真なし</div>`}
       <div class="body">
-        <div class="name">${esc(m.name)}</div>
-        <div class="desc">${esc(m.desc)}</div>
-        <div class="price">${yen(m.price)}</div>
+        <div class="name">${esc(m.name)}${m.seasonal ? ` <span class="season-badge">季節</span>` : ""}</div>
+        ${m.desc ? `<div class="desc">${esc(m.desc)}</div>` : ""}
+        <div class="price">${yen(m.price)}${m.choice && m.choice.options.some(o => o.delta > 0) ? "〜" : ""}</div>
       </div>
     </button>`).join("");
   $("item-grid").querySelectorAll(".item").forEach(b =>
@@ -88,23 +88,25 @@ function renderGrid() {
 }
 
 // ---------- 商品詳細 ----------
-let detail = null; // {item, cut, pack, toppings:Set, qty}
+let detail = null; // {item, cut, pack, choice, toppings:Set, qty}
 function openDetail(id) {
   const item = menuById(id);
-  detail = { item, cut: "nocut", pack: "paper", toppings: new Set(), qty: 1 };
+  detail = { item, cut: "nocut", pack: "paper",
+             choice: item.choice ? item.choice.options[0].label : null,
+             toppings: new Set(), qty: 1 };
   renderDetail();
   show("scr-detail");
 }
 function hasCutPack(item) { return CUT_PACK_CATS.includes(item.cat); }
-function detailUnit() { return unitPrice(detail.item, [...detail.toppings], detail.pack); }
+function detailUnit() { return unitPrice(detail.item, [...detail.toppings], detail.pack, detail.choice); }
 function renderDetail() {
   const it = detail.item;
   let html = `
     <div class="card" style="padding:0;overflow:hidden;">
-      <img src="${esc(it.img)}" alt="${esc(it.name)}" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;">
+      ${it.img ? `<img src="${esc(it.img)}" alt="${esc(it.name)}" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;">` : ""}
       <div style="padding:14px;">
-        <div style="font-size:20px;font-weight:900;">${esc(it.name)}</div>
-        <div class="note" style="margin-top:4px;">${esc(it.desc)}</div>
+        <div style="font-size:20px;font-weight:900;">${esc(it.name)}${it.seasonal ? ` <span class="season-badge">季節メニュー</span>` : ""}</div>
+        ${it.desc ? `<div class="note" style="margin-top:4px;">${esc(it.desc)}</div>` : ""}
         <div style="font-weight:900;font-size:19px;margin-top:8px;">${yen(it.price)}</div>
       </div>
     </div>`;
@@ -134,10 +136,16 @@ function renderDetail() {
     </div>`;
     }
   }
+  if (it.choice) {
+    html += `<div class="opt-group"><div class="label">${esc(it.choice.label)}</div><div class="opt-row">` +
+      it.choice.options.map(o => `
+        <button data-choice="${esc(o.label)}" class="${detail.choice === o.label ? "active" : ""}">${esc(o.label)}${o.delta ? ` <span style="color:var(--red-dark);">+${yen(o.delta)}</span>` : ""}</button>`).join("") +
+      `</div></div>`;
+  }
   if ((it.toppings || []).length) {
     html += `<div class="opt-group"><div class="label">トッピング・変更</div><div class="check-row">` +
       it.toppings.map(t => `
-        <label><span>${esc(t.label)} <span style="color:var(--red-dark);">+${yen(t.delta)}</span></span>
+        <label><span>${esc(t.label)}${t.delta ? ` <span style="color:var(--red-dark);">+${yen(t.delta)}</span>` : ""}</span>
         <input type="checkbox" data-top="${esc(t.label)}" ${detail.toppings.has(t.label) ? "checked" : ""}></label>`).join("") +
       `</div></div>`;
   }
@@ -159,13 +167,16 @@ function renderDetail() {
     const boxBtn = $("pack-box");
     if (boxBtn && !boxBtn.disabled) boxBtn.addEventListener("click", () => { detail.pack = "box"; detail.cut = "nocut"; renderDetail(); });
   }
+  $("detail-body").querySelectorAll("[data-choice]").forEach(b =>
+    b.addEventListener("click", () => { detail.choice = b.dataset.choice; renderDetail(); }));
   $("detail-body").querySelectorAll("[data-top]").forEach(cb =>
     cb.addEventListener("change", () => { cb.checked ? detail.toppings.add(cb.dataset.top) : detail.toppings.delete(cb.dataset.top); renderDetail(); }));
   $("qty-minus").addEventListener("click", () => { if (detail.qty > 1) detail.qty--; renderDetail(); });
   $("qty-plus").addEventListener("click", () => { if (detail.qty < MAX_QTY) detail.qty++; renderDetail(); });
   $("add-cart").addEventListener("click", () => {
     cart.push({ itemId: it.id, qty: detail.qty, cut: hasCutPack(it) ? detail.cut : null,
-                pack: hasCutPack(it) && mode === "takeout" ? detail.pack : null, toppings: [...detail.toppings] });
+                pack: hasCutPack(it) && mode === "takeout" ? detail.pack : null,
+                choice: detail.choice, toppings: [...detail.toppings] });
     updateCartbar(true);
     toast(`${it.name}をカートに入れました`);
     show("scr-order");
@@ -216,6 +227,7 @@ function renderCart() {
       const custom = [
         c.cut ? (c.cut === "cut4" ? "4カット" : "未カット") : null,
         c.pack ? (c.pack === "box" ? "箱（+100円）" : "紙皿・ホイル") : null,
+        c.choice || null,
         ...(c.toppings || []),
       ].filter(Boolean).join("／");
       return `<div class="cart-line">
@@ -227,7 +239,7 @@ function renderCart() {
             <button class="del-btn" data-del="${i}">削除</button>
           </div>
         </div>
-        <div class="amt">${yen(unitPrice(it, c.toppings, c.pack) * c.qty)}</div>
+        <div class="amt">${yen(unitPrice(it, c.toppings, c.pack, c.choice) * c.qty)}</div>
       </div>`;
     }).join("") + `<div style="text-align:right;font-weight:900;font-size:19px;padding-top:10px;">合計 ${yen(cartTotal())}</div>`;
     $("cart-list").querySelectorAll("[data-inc]").forEach(b => b.addEventListener("click", () => {
@@ -312,9 +324,9 @@ async function submitOrder() {
     }
     const items = cart.map(c => {
       const it = menuById(c.itemId);
-      const up = unitPrice(it, c.toppings, c.pack);
+      const up = unitPrice(it, c.toppings, c.pack, c.choice);
       return { itemId: c.itemId, name: it.name, qty: c.qty, unitPrice: up, lineTotal: up * c.qty,
-               cut: c.cut, pack: c.pack, toppings: c.toppings || [] };
+               cut: c.cut, pack: c.pack, choice: c.choice || null, toppings: c.toppings || [] };
     });
     const orderNo = makeOrderNo();
     const ref = await addDoc(collection(db, "takeoutOrders"), {
@@ -408,6 +420,7 @@ function searchStatus() {
         <div style="margin-top:8px;">${(o.items || []).map(i => {
           const custom = [i.cut ? (i.cut === "cut4" ? "4カット" : "未カット") : null,
                           i.pack ? (i.pack === "box" ? "箱" : "紙皿・ホイル") : null,
+                          i.choice || null,
                           ...(i.toppings || [])].filter(Boolean).join("／");
           return `<div>${esc(i.name)} × ${i.qty}${custom ? `<span class="note">（${esc(custom)}）</span>` : ""}</div>`;
         }).join("")}</div>
@@ -443,6 +456,7 @@ function renderDineinCart() {
       const it = menuById(c.itemId);
       const custom = [
         c.cut ? (c.cut === "cut4" ? "4カット" : "未カット") : null,
+        c.choice || null,
         ...(c.toppings || []),
       ].filter(Boolean).join("／");
       return `<div class="cart-line">
@@ -454,7 +468,7 @@ function renderDineinCart() {
             <button class="del-btn" data-ddel="${i}">削除</button>
           </div>
         </div>
-        <div class="amt">${yen(unitPrice(it, c.toppings, c.pack) * c.qty)}</div>
+        <div class="amt">${yen(unitPrice(it, c.toppings, c.pack, c.choice) * c.qty)}</div>
       </div>`;
     }).join("") + `<div style="text-align:right;font-weight:900;font-size:19px;padding-top:10px;">合計 ${yen(cartTotal())}</div>`;
     $("dinein-cart-list").querySelectorAll("[data-dinc]").forEach(b => b.addEventListener("click", () => {
@@ -491,9 +505,9 @@ async function submitDinein() {
   try {
     const items = cart.map(c => {
       const it = menuById(c.itemId);
-      const up = unitPrice(it, c.toppings, null);
+      const up = unitPrice(it, c.toppings, null, c.choice);
       return { itemId: c.itemId, name: it.name, qty: c.qty, unitPrice: up, lineTotal: up * c.qty,
-               cut: c.cut, pack: null, toppings: c.toppings || [] };
+               cut: c.cut, pack: null, choice: c.choice || null, toppings: c.toppings || [] };
     });
     const orderNo = makeDineinNo();
     const ref = await addDoc(collection(db, "dineInOrders"), {
