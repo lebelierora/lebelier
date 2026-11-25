@@ -44,9 +44,9 @@ export const FROZEN_MENU = [
   { id: "fz-rugerita-only", cat: "fz-set", name: "群馬ルゲリータだけセット", price: 2560, img: "images/fz-rugerita-only.jpg",
     desc: "群馬県産小麦100%使用のマルゲリータの揚げピザ、6個入り（1個約150g）です。",
     choice: CHEESE2(860) },
-  { id: "fz-jiru-only", cat: "fz-set", name: "群馬ジルチキンだけセット", price: 2560, img: "images/fz-gunma-jiru.jpg",
+  { id: "fz-jiru-only", cat: "fz-set", name: "群馬ジルチキンだけセット", price: 2560, img: "images/fz-jiru-only.jpg",
     desc: "群馬県産小麦100%使用のバジルチキンの揚げピザ、6個入りです。このページだけのオリジナルセットです。" },
-  { id: "fz-toro-only", cat: "fz-set", name: "群馬トロフロマッジだけセット", price: 2560, img: "images/fz-gunma-toro.jpg",
+  { id: "fz-toro-only", cat: "fz-set", name: "群馬トロフロマッジだけセット", price: 2560, img: "images/fz-toro-only.jpg",
     desc: "群馬県産小麦100%使用のクアトロフロマッジの揚げピザ、6個入りです。このページだけのオリジナルセットです。" },
 
   // ---- 冷凍ホールピザ ----
