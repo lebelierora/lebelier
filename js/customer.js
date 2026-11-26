@@ -740,7 +740,6 @@ function renderSeal() {
 $("seal-yes").addEventListener("click", () => { sealChoice = "need"; renderSeal(); });
 $("seal-no").addEventListener("click", () => { sealChoice = "none"; renderSeal(); });
 $("go-frozen").addEventListener("click", () => { setMode("frozen"); currentCat = "fz-set"; renderTabs(); renderGrid(); show("scr-order"); });
-$("go-dinein").addEventListener("click", enterDinein);
 $("seat-back").addEventListener("click", () => { setMode("takeout"); show("scr-home"); });
 $("dinein-back").addEventListener("click", () => show("scr-order"));
 $("submit-dinein").addEventListener("click", submitDinein);
