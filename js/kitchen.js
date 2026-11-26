@@ -287,7 +287,7 @@ function renderCalls() {
   area.innerHTML = `<h2 style="margin:4px 0 10px;">🔔 呼び出し ${calls.length}件</h2>` +
     calls.map(c => `<div class="call-card">
       <div class="call-seat">${esc(c.seatLabel || seatLabel(c.seat))}</div>
-      <div style="font-weight:800;">店員を呼んでいます</div>
+      <div style="font-weight:800;">${c.purpose && c.purpose !== "通常の呼び出し" ? esc(c.purpose) : "店員を呼んでいます"}</div>
       <div class="act-row">
         <button class="btn" data-call-done="${c.id}">対応した</button>
       </div>
@@ -311,7 +311,9 @@ function itemsHtml(o) {
                     i.pack ? (i.pack === "box" ? "箱" : "紙皿・ホイル") : null,
                     i.choice || null,
                     ...(i.toppings || [])].filter(Boolean).join("／");
-    return `<div><div class="kitem">${esc(i.name)} × ${i.qty}</div>${custom ? `<div class="kcustom">${esc(custom)}</div>` : ""}</div>`;
+    const timingLine = (i.timing && i.timing !== "すぐ提供" && i.timing !== "できた順")
+      ? `<div class="kcustom" style="color:#b3271e;font-weight:900;">⏰ 提供：${esc(i.timing)}</div>` : "";
+    return `<div><div class="kitem">${esc(i.name)} × ${i.qty}</div>${custom ? `<div class="kcustom">${esc(custom)}</div>` : ""}${timingLine}</div>`;
   }).join("");
 }
 

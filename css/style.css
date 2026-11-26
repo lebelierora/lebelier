@@ -147,3 +147,8 @@ body.frozen .item .noimg{aspect-ratio:4/3;}
 
 /* 平日セットの案内（お客様側） */
 .set-note { background:#eafaf1; border:2px solid #27ae60; color:#1e8449; border-radius:12px; padding:10px 14px; font-weight:800; font-size:16px; margin-top:10px; }
+
+/* 呼び出しモーダル */
+.modal{position:fixed;inset:0;background:rgba(40,25,15,.55);display:flex;align-items:center;justify-content:center;z-index:60;padding:18px;}
+.modal-card{background:#fffdf7;border-radius:18px;padding:20px;width:100%;max-width:420px;box-shadow:0 12px 32px rgba(0,0,0,.3);}
+.modal-card .btn{width:100%;}
