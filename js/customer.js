@@ -49,10 +49,6 @@ function cartHasSetCombo() {
 function setEligibleTakeout() {
   return mode === "takeout" && isSetDay(selDate) && inSetWindow(selTime) && cartHasSetCombo();
 }
-function updateSetNotes() {
-  const t = $("set-note");
-  if (t) t.classList.toggle("hidden", !setEligibleTakeout());
-}
 
 const $ = id => document.getElementById(id);
 const screens = ["scr-home", "scr-seat", "scr-order", "scr-detail", "scr-checkout", "scr-dinein", "scr-done", "scr-status"];
@@ -381,7 +377,6 @@ function renderCart() {
       cart.splice(+b.dataset.del, 1); renderCart(); renderSlots(); updateCartbar(false);
     }));
   }
-  updateSetNotes();
 }
 function renderSlots() {
   const slots = timeSlots(selDate, cartQty());
@@ -401,8 +396,7 @@ function renderSlots() {
     ? (isThursday(selDate) ? "木曜日は定休日です。別の日をお選びください。" : "本日の受け取り枠は終了しました。別の日をお選びください。")
     : slots.every(s => occupiedTimes.has(s)) ? "この日の受け取り枠はすべて埋まっています。別の日をお選びください。" : "";
   $("slot-grid").querySelectorAll("button:not(:disabled)").forEach(b =>
-    b.addEventListener("click", () => { selTime = b.dataset.slot; renderSlots(); }));  updateSetNotes();
-}
+    b.addEventListener("click", () => { selTime = b.dataset.slot; renderSlots(); }));}
 function openCheckout() {
   if (mode === "frozen") {
     // 冷凍予約の初期日は翌々日（定休日の木曜ならその翌日）
@@ -668,7 +662,6 @@ function renderDineinCart() {
       cart.splice(+b.dataset.ddel, 1); renderDineinCart(); updateCartbar(false);
     }));
   }
-  updateSetNotes();
 }
 function openDineinCheckout() {
   $("dinein-checkout-seat").textContent = seatLabel(seat);
