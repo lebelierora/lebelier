@@ -98,7 +98,7 @@ function startListeners() {
       .sort((a, b) => tsMillis(a.createdAt) - tsMillis(b.createdAt));
     const ids = new Set(calls.map(c => c.id));
     if (startedCalls) {
-      for (const id of ids) if (!knownCalls.has(id)) playCallSound();
+      for (const c of calls) if (!knownCalls.has(c.id)) playCallSound(c.purpose);
     }
     knownCalls = ids;
     startedCalls = true;
@@ -113,7 +113,7 @@ function startListeners() {
   setInterval(() => {
     if (orders.some(o => o.status === "pending" && isVisible(o)) ||
         dineinOrders.some(o => o.status === "pending")) playSound();
-    if (calls.length > 0) playCallSound();
+    if (calls.length > 0) playCallSound(calls[0].purpose); // 一番長く待っている呼び出しの用件で知らせる
   }, 4000);
 }
 
@@ -464,9 +464,23 @@ function playSound() {
   a.currentTime = 0;
   a.play().catch(() => {});
 }
-function playCallSound() {
+// 呼び出しの用件ごとの音声（通常の呼び出しは従来の「お客様がお呼びです！」）
+const CALL_SOUNDS = {
+  "食後のドリンクをお願いします": "audio/moko-call-drink-v1.mp3",
+  "食後のスイーツをお願いします": "audio/moko-call-sweets-v1.mp3",
+  "空いた食器を下げてください": "audio/moko-call-dishes-v1.mp3",
+  "お会計をお願いします": "audio/moko-call-bill-v1.mp3",
+};
+const callAudioCache = {};
+function playCallSound(purpose) {
   if (!soundEnabled) return;
-  const a = $("call-sound");
+  let a;
+  if (purpose && CALL_SOUNDS[purpose]) {
+    if (!callAudioCache[purpose]) { callAudioCache[purpose] = new Audio(CALL_SOUNDS[purpose]); callAudioCache[purpose].preload = "auto"; }
+    a = callAudioCache[purpose];
+  } else {
+    a = $("call-sound");
+  }
   a.currentTime = 0;
   a.play().catch(() => {});
 }
