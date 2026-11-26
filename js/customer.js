@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js?v=20251125-80";
+import { db } from "./firebase-config.js?v=20251125-81";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,10 +7,10 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js?v=20251125-80";
+} from "./menu.js?v=20251125-81";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
-} from "./frozen-menu.js?v=20251125-80";
+} from "./frozen-menu.js?v=20251125-81";
 
 // 焼きピザ・冷凍ピザ両方のメニューから商品を引く
 const anyById = id => menuById(id) || frozenById(id);
@@ -271,6 +271,7 @@ function renderDetail() {
 // ---------- チェックアウト ----------
 let selDate = todayKey();
 let selTime = null;
+let sealChoice = null; // 冷凍予約の温め方シール: "need" | "none"
 let occupiedTimes = new Set(); // 選択中の受け取り日に既に注文が入っている時刻（重複防止）
 let slotSub = null;            // 枠の埋まり状況の購読解除関数
 let submitting = false;        // 注文送信中は、自分の注文で枠が埋まった通知を抑制する
@@ -371,6 +372,9 @@ function openCheckout() {
     selDate = todayKey();
   }
   selTime = null;
+  sealChoice = null;
+  $("seal-group").classList.toggle("hidden", mode !== "frozen");
+  renderSeal();
   renderCart();
   renderDateChips($("date-chips"), selDate, pickDate);
   renderSlots();
@@ -400,6 +404,7 @@ async function submitOrder() {
   const err = msg => { $("order-error").innerHTML = `<div class="err" style="margin-top:12px;">${esc(msg)}</div>`; };
   if (cart.length === 0) return err("カートが空です。メニューから商品をお選びください。");
   if (!selTime) return err("受け取り時刻をお選びください。");
+  if (mode === "frozen" && !sealChoice) return err("温め方のシールが必要かお選びください。");
   if (!name) return err("お名前を入力してください。");
   if (phone.length < 10) return err("電話番号を正しく入力してください。");
 
@@ -434,6 +439,7 @@ async function submitOrder() {
     const ref = await addDoc(collection(db, "takeoutOrders"), {
       orderNo, name, phone, note,
       kind: mode === "frozen" ? "frozen" : "takeout",
+      seal: mode === "frozen" ? sealChoice : null,
       items, total: cartTotal(), totalQty: cartQty(),
       pickupDate: selDate, requestedDate: selDate, pickupTime: selTime, requestedPickup: selTime,
       confirmedPickup: null, confirmedDate: null, status: "pending",
@@ -470,6 +476,7 @@ function showDone(docId, orderNo) {
     const o = snap.data();
     let html = `<div class="card" style="text-align:center;">`;
     if (o.kind === "frozen") html += `<p class="note" style="font-weight:900;font-size:16px;">冷凍ピザの店頭予約</p><div class="frozen-banner">🧊 ご来店の際は、保冷バッグと保冷剤をご持参ください（冷凍ピザのお持ち帰り用です）</div>`;
+    if (o.kind === "frozen" && o.seal) html += `<p class="note" style="font-weight:800;">温め方のシール：${o.seal === "none" ? "不用（お付けしません）" : "必要"}</p>`;
     if (o.status === "pending") {
       html += `<div style="font-size:40px;">⌛</div>
         <h2 style="margin:8px 0;">お店の確認待ちです。確定までお待ちください</h2>
@@ -695,6 +702,14 @@ document.querySelectorAll(".guide-toggle").forEach(btn => {
 });
 
 $("go-order").addEventListener("click", () => { setMode("takeout"); currentCat = "seasonal"; renderTabs(); renderGrid(); show("scr-order"); });
+function renderSeal() {
+  const y = $("seal-yes"), n = $("seal-no");
+  if (!y || !n) return;
+  y.classList.toggle("active", sealChoice === "need");
+  n.classList.toggle("active", sealChoice === "none");
+}
+$("seal-yes").addEventListener("click", () => { sealChoice = "need"; renderSeal(); });
+$("seal-no").addEventListener("click", () => { sealChoice = "none"; renderSeal(); });
 $("go-frozen").addEventListener("click", () => { setMode("frozen"); currentCat = "fz-set"; renderTabs(); renderGrid(); show("scr-order"); });
 $("go-dinein").addEventListener("click", enterDinein);
 $("seat-back").addEventListener("click", () => { setMode("takeout"); show("scr-home"); });

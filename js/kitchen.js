@@ -2,13 +2,13 @@
 // テスト段階の簡易保護として PIN ゲートを使う（本番前に Firebase Auth へ移行すること）。
 const KITCHEN_PIN = "2321"; // テスト用PIN（店の電話番号の下4桁）
 
-import { db } from "./firebase-config.js?v=20251125-80";
+import { db } from "./firebase-config.js?v=20251125-81";
 import {
   collection, onSnapshot, query, where, doc, updateDoc, setDoc, deleteDoc, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   todayKey, addDays, isThursday, formatDateJP, lastSlot, toMin, toHHMM, occupiedTime, esc, yen, seatLabel,
-} from "./menu.js?v=20251125-80";
+} from "./menu.js?v=20251125-81";
 
 const $ = id => document.getElementById(id);
 
@@ -308,6 +308,7 @@ function cardHtml(o) {
     <div>${regularBadge(o)} <strong style="font-size:18px;">${esc(o.name)} 様</strong>
       <a href="tel:${esc(o.phone)}" style="font-weight:800;">${esc(o.phone)}</a></div>
     ${o.note ? `<div class="kcustom">備考：${esc(o.note)}</div>` : ""}
+    ${o.kind === "frozen" && o.seal ? `<div class="kcustom" style="font-weight:900;${o.seal === "none" ? "color:#c0392b;" : ""}">温め方シール：${o.seal === "none" ? "不要（貼らない）" : "必要（各商品に貼る）"}</div>` : ""}
     <div>${itemsHtml(o)}</div>
     <div class="ktotal">合計 ${yen(o.total)}</div>
     ${isPending ? `
