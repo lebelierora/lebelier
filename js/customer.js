@@ -26,6 +26,7 @@ function isSetDay(dateStr) {
   if (!dateStr) return false;
   const md = dateStr.slice(5);
   if (["12-29","12-30","12-31","01-01","01-02","01-03"].includes(md)) return false; // 年末年始は無効
+  if (["08-13","08-14","08-15","08-16"].includes(md)) return false; // お盆は無効
   if (SET_HOLIDAYS.has(dateStr)) return false; // 祝日は無効
   const wd = new Date(dateStr + "T12:00:00").getDay();
   return [1, 2, 3, 5].includes(wd); // 月・火・水・金（木曜定休、土日は対象外）
