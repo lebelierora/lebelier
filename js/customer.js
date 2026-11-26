@@ -49,6 +49,10 @@ function cartHasSetCombo() {
 function setEligibleTakeout() {
   return mode === "takeout" && isSetDay(selDate) && inSetWindow(selTime) && cartHasSetCombo();
 }
+function updateSetNotes() {
+  const t = $("set-note");
+  if (t) t.classList.toggle("hidden", !setEligibleTakeout());
+}
 
 const $ = id => document.getElementById(id);
 const screens = ["scr-home", "scr-seat", "scr-order", "scr-detail", "scr-checkout", "scr-dinein", "scr-done", "scr-status"];
@@ -377,6 +381,7 @@ function renderCart() {
       cart.splice(+b.dataset.del, 1); renderCart(); renderSlots(); updateCartbar(false);
     }));
   }
+  updateSetNotes();
 }
 function renderSlots() {
   const slots = timeSlots(selDate, cartQty());
@@ -419,7 +424,7 @@ function openCheckout() {
   if (savedName) $("cust-name").value = savedName;
   if (savedPhone) $("cust-phone").value = savedPhone;
   $("order-error").innerHTML = "";
-  show("scr-checkout");
+  show("scr-checkout");  updateSetNotes();
 }
 function pickDate(k) { selDate = k; selTime = null; renderDateChips($("date-chips"), selDate, pickDate); renderSlots(); if (mode !== "frozen") watchSlots(); }
 
@@ -532,6 +537,7 @@ function showDone(docId, orderNo) {
     let html = `<div class="card" style="text-align:center;">`;
     if (o.kind === "frozen") html += `<p class="note" style="font-weight:900;font-size:16px;">冷凍ピザの店頭予約</p><div class="frozen-banner">🧊 ご来店の際は、保冷バッグと保冷剤をご持参ください（冷凍ピザのお持ち帰り用です）</div>`;
     if (o.kind === "frozen" && o.seal) html += `<p class="note" style="font-weight:800;">温め方のシール：${o.seal === "none" ? "不用（お付けしません）" : "必要"}</p>`;
+    if (o.setMeal) html += `<p class="set-note" style="text-align:left;">🍕 平日セット対象です。揚げ物をサービスでお付けします。</p>`;
     if (o.status === "pending") {
       html += `<div style="font-size:40px;">⌛</div>
         <h2 style="margin:8px 0;">お店の確認待ちです。確定までお待ちください</h2>
@@ -595,6 +601,7 @@ function renderStatusResults() {
           <span class="note">注文番号 ${esc(o.orderNo)}${o.kind === "frozen" ? "（冷凍ピザ予約）" : ""}</span>${statusChip(o.status)}
         </div>
         <div class="big-time" style="font-size:26px;margin-top:8px;">受け取り：${esc(o.confirmedPickup || o.requestedPickup)}</div>
+        ${o.setMeal ? `<p class="set-note">🍕 平日セット対象です。揚げ物をサービスでお付けします。</p>` : ""}
         ${o.status === "confirmed" && o.confirmedDate && o.requestedDate && o.confirmedDate !== o.requestedDate
           ? `<p style="font-weight:800;color:var(--warn);margin:4px 0;">受け取り日が ${esc(formatDateJP(o.confirmedDate))} に変更になりました</p>` : ""}
         ${o.status === "confirmed" && o.confirmedPickup && o.confirmedPickup !== o.requestedPickup
@@ -662,6 +669,7 @@ function renderDineinCart() {
       cart.splice(+b.dataset.ddel, 1); renderDineinCart(); updateCartbar(false);
     }));
   }
+  updateSetNotes();
 }
 function openDineinCheckout() {
   $("dinein-checkout-seat").textContent = seatLabel(seat);
