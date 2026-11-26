@@ -102,7 +102,7 @@ export const MENU = [
   { id: "grill-sausage", cat: "side", name: "グリルソーセージ", img: "images/grill-sausage.jpg", imgDineIn: "images/grill-sausage-dinein.jpg", price: 400, desc: "グリルソーセージ。4本から、本数をお選びください（1本追加ごとに+100円）。", dineInOnly: true, choice: { label: "本数をお選びください", options: [{ label: "4本", delta: 0 }, { label: "5本", delta: 100 }, { label: "6本", delta: 200 }, { label: "7本", delta: 300 }, { label: "8本", delta: 400 }] }, toppings: [] },
   { id: "milano-salami", cat: "side", name: "ミラノサラミ", img: "images/milano-salami.jpg", imgDineIn: "images/milano-salami-dinein.jpg", price: 550, desc: "ミラノサラミ。", dineInOnly: true, toppings: [] },
   { id: "prosciutto", cat: "side", name: "生ハム プロシュート", img: "images/prosciutto.jpg", imgDineIn: "images/prosciutto-dinein.jpg", price: 680, desc: "生ハム プロシュート。", dineInOnly: true, toppings: [] },
-  { id: "coppa", cat: "side", name: "コッパ（豚肩ロースハム）", img: "images/coppa.jpg", price: 580, desc: "コッパ（豚肩ロースハム）。", dineInOnly: true, toppings: [] },
+  { id: "coppa", cat: "side", name: "コッパ（豚肩ロースハム）", img: "images/coppa.jpg", imgDineIn: "images/coppa-dinein.jpg", price: 580, desc: "コッパ（豚肩ロースハム）。", dineInOnly: true, toppings: [] },
   { id: "speck", cat: "side", name: "スペック（燻製生ハム）", img: "images/speck.jpg", price: 580, desc: "スペック（燻製生ハム）。", dineInOnly: true, toppings: [] },
   { id: "smoked-chicken-slice", cat: "side", name: "スモークチキンスライス", img: "images/smoked-chicken-slice.jpg", imgDineIn: "images/smoked-chicken-dinein.jpg", price: 500, desc: "スモークチキンのスライス。", dineInOnly: true, toppings: [] },
   // ---- ソフトドリンク ----
