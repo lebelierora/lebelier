@@ -151,12 +151,27 @@ function effImg(it) {
 function effDesc(it) { return (mode === "dinein" && it.descDineIn !== undefined) ? it.descDineIn : (it.desc || ""); }
 
 // ---------- 商品詳細 ----------
-let detail = null; // {item, cut, pack, choice, toppings:Set, qty}
+// ---------- 提供タイミング（店内のみ） ----------
+// ドリンク: すぐ提供／最初の商品と一緒／食後、スイーツ系: できた順／最後。先頭が既定（選ばなくても注文できる）
+const TIMING_DRINK = ["すぐ提供", "最初の商品と一緒", "食後"];
+const TIMING_SWEET = ["できた順", "最後"];
+function timingOptions(it) {
+  if (mode !== "dinein") return null;
+  const kind = it.timing || (it.cat === "drink" ? "drink"
+    : ["sweetpizza", "sweetage", "sweets"].includes(it.cat) ? "sweet" : null);
+  if (kind === "drink") return TIMING_DRINK;
+  if (kind === "sweet") return TIMING_SWEET;
+  return null;
+}
+
+let detail = null; // {item, cut, pack, choice, toppings:Set, qty, timing}
 function openDetail(id) {
   const item = anyById(id);
+  const topts = timingOptions(item);
   detail = { item, cut: "nocut", pack: "paper",
              choice: null, // choice は未選択スタート。選ぶまでカートに入れられない
-             toppings: new Set(), qty: 1, descOpen: false };
+             toppings: new Set(), qty: 1, descOpen: false,
+             timing: topts ? topts[0] : null };
   renderDetail();
   show("scr-detail");
 }
@@ -273,6 +288,12 @@ function renderDetail() {
         <input type="checkbox" data-top="${esc(t.label)}" ${detail.toppings.has(t.label) ? "checked" : ""}></label>`).join("") +
       `</div></div>`;
   }
+  const topts = timingOptions(it);
+  if (topts) {
+    html += `<div class="opt-group"><div class="label">提供タイミング</div><div class="opt-row">` +
+      topts.map(t => `<button data-timing="${esc(t)}" class="${detail.timing === t ? "active" : ""}">${esc(t)}</button>`).join("") +
+      `</div></div>`;
+  }
   html += `
     <div class="opt-group">
       <div class="label">数量</div>
@@ -299,13 +320,15 @@ function renderDetail() {
     b.addEventListener("click", () => { detail.choice = b.dataset.choice; renderDetail(); }));
   $("detail-body").querySelectorAll("[data-top]").forEach(cb =>
     cb.addEventListener("change", () => { cb.checked ? detail.toppings.add(cb.dataset.top) : detail.toppings.delete(cb.dataset.top); renderDetail(); }));
+  $("detail-body").querySelectorAll("[data-timing]").forEach(b =>
+    b.addEventListener("click", () => { detail.timing = b.dataset.timing; renderDetail(); }));
   $("qty-minus").addEventListener("click", () => { if (detail.qty > 1) detail.qty--; renderDetail(); });
   $("qty-plus").addEventListener("click", () => { if (detail.qty < MAX_QTY) detail.qty++; renderDetail(); });
   $("add-cart").addEventListener("click", () => {
     if (it.choice && (mode === "dinein" || !it.choice.dineInOnly) && !detail.choice) return; // 念のため：未選択では追加しない
     cart.push({ itemId: it.id, qty: detail.qty, cut: hasCutPack(it) ? detail.cut : null,
                 pack: hasCutPack(it) && mode === "takeout" ? detail.pack : null,
-                choice: detail.choice, toppings: [...detail.toppings] });
+                choice: detail.choice, toppings: [...detail.toppings], timing: detail.timing || null });
     updateCartbar(true);
     toast(`${it.name}をカートに入れました`);
     show("scr-order");
@@ -650,6 +673,7 @@ function renderDineinCart() {
         c.cut ? (c.cut === "cut4" ? "4カット" : c.cut === "cut6" ? "6カット" : "未カット") : null,
         c.choice || null,
         ...(c.toppings || []),
+        (c.timing && c.timing !== "すぐ提供" && c.timing !== "できた順") ? `提供：${c.timing}` : null,
       ].filter(Boolean).join("／");
       return `<div class="cart-line">
         <div class="grow">
@@ -700,7 +724,7 @@ async function submitDinein() {
       const it = anyById(c.itemId);
       const up = unitPrice(it, c.toppings, null, c.choice);
       return { itemId: c.itemId, name: it.name, qty: c.qty, unitPrice: up, lineTotal: up * c.qty,
-               cut: c.cut, pack: null, choice: c.choice || null, toppings: c.toppings || [] };
+               cut: c.cut, pack: null, choice: c.choice || null, toppings: c.toppings || [], timing: c.timing || null };
     });
     const orderNo = makeDineinNo();
     const ref = await addDoc(collection(db, "dineInOrders"), {
@@ -748,13 +772,26 @@ function showDineinDone(docId, orderNo) {
 
 // ---------- 店員を呼ぶ ----------
 let callBusy = false;
-async function callStaff(msgEl) {
+// 呼び出しの用件（後から増やすときはこのリストに足すだけ）
+const CALL_PURPOSES = ["通常の呼び出し", "食後のドリンクをお願いします", "食後のスイーツをお願いします", "空いた食器を下げてください", "お会計をお願いします"];
+let pendingCallMsg = null;
+function openCallModal(msgEl) {
+  if (!seat) { msgEl.textContent = "先にお席をお選びください。"; return; }
+  pendingCallMsg = msgEl;
+  $("call-purposes").innerHTML = CALL_PURPOSES.map(p =>
+    `<button class="btn ghost" data-purpose="${esc(p)}" style="margin-top:8px;">${esc(p)}</button>`).join("");
+  $("call-purposes").querySelectorAll("[data-purpose]").forEach(b =>
+    b.addEventListener("click", () => { $("call-modal").classList.add("hidden"); callStaff(pendingCallMsg, b.dataset.purpose); }));
+  $("call-modal").classList.remove("hidden");
+}
+async function callStaff(msgEl, purpose) {
   if (!seat) { msgEl.textContent = "先にお席をお選びください。"; return; }
   if (callBusy) return;
   callBusy = true;
   try {
     await addDoc(collection(db, "calls"), {
       seat, seatLabel: seatLabel(seat), status: "open",
+      purpose: purpose || "通常の呼び出し",
       createdAt: serverTimestamp(),
     });
     msgEl.textContent = "店員をお呼びしました。お席まで伺います。";
@@ -791,9 +828,11 @@ $("go-frozen").addEventListener("click", () => { setMode("frozen"); currentCat =
 $("seat-back").addEventListener("click", () => { setMode("takeout"); show("scr-home"); });
 $("dinein-back").addEventListener("click", () => show("scr-order"));
 $("submit-dinein").addEventListener("click", submitDinein);
-$("call-btn-order").addEventListener("click", () => callStaff($("call-msg-order")));
-$("call-btn-checkout").addEventListener("click", () => callStaff($("call-msg-checkout")));
-$("call-btn-done").addEventListener("click", () => callStaff($("call-msg-done")));
+$("call-btn-order").addEventListener("click", () => openCallModal($("call-msg-order")));
+$("call-btn-checkout").addEventListener("click", () => openCallModal($("call-msg-checkout")));
+$("call-btn-done").addEventListener("click", () => openCallModal($("call-msg-done")));
+$("call-cancel").addEventListener("click", () => $("call-modal").classList.add("hidden"));
+$("call-modal").addEventListener("click", e => { if (e.target === $("call-modal")) $("call-modal").classList.add("hidden"); });
 $("done-more").addEventListener("click", () => {
   if (dineinDoneUnsub) dineinDoneUnsub();
   $("done-dinein-extra").classList.add("hidden");
