@@ -142,7 +142,7 @@ export const MENU = [
   { id: "lemon-chuhai", cat: "alcohol", name: "レモンチューハイ", img: "images/lemon-chuhai.jpg", price: 450, desc: "レモンのチューハイ。", dineInOnly: true, toppings: [] },
   { id: "liqueur", cat: "alcohol", name: "リキュール各種（ソーダ割り）", img: "images/liqueur.jpg", price: 500, desc: "すべてソーダ割りでご提供します。種類をお選びください。", dineInOnly: true, choice: { label: "種類をお選びください", options: [{ label: "パスティス", delta: 0 }, { label: "カルヴァドス", delta: 0 }, { label: "アマレット", delta: 0 }, { label: "ジン", delta: 0 }, { label: "ラム", delta: 0 }, { label: "ジェット（ミント）", delta: 0 }, { label: "カンパリ", delta: 0 }] }, toppings: [] },
   // ---- スイーツ ----
-  { id: "apple-caramel-parfait", cat: "sweets", name: "りんごとキャラメルのミニパフェ", price: 600, desc: "", hidden: true, toppings: [] },
+  { id: "apple-caramel-parfait", cat: "sweets", name: "りんごとキャラメルのミニパフェ", img: "images/apple-caramel-parfait.jpg", price: 600, desc: "りんごのコンポートとキャラメルソース、バニラアイスを重ねた店内限定のミニパフェです。", seasonal: true, dineInOnly: true, eatInBadge: true, timing: "sweet", toppings: [] },
   { id: "gateau-chocolat", cat: "sweets", name: "ガトーショコラ", img: "images/gateau-chocolat.jpg", price: 500, desc: "濃厚なカカオの風味としっとりとした口どけ。食後にぴったりの定番スイーツです。", dineInOnly: true, toppings: [{ label: "バニラアイス", delta: 150 }] },
   { id: "choco-banana-sundae", cat: "sweets", name: "スペシャルチョコバナナサンデー", img: "images/choco-banana-sundae.jpg", price: 600, desc: "ベルギーチョコアイス・バナナ・ホイップクリーム・ビターチョコ・チョコクッキー（小麦粉無し）のスペシャルサンデー。", dineInOnly: true, toppings: [] },
   { id: "affogato", cat: "sweets", name: "アッフォガード", img: "images/affogato.jpg", price: 500, desc: "エスプレッソとバニラアイスのデザート。", dineInOnly: true, toppings: [] },
