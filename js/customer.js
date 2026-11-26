@@ -49,18 +49,9 @@ function cartHasSetCombo() {
 function setEligibleTakeout() {
   return mode === "takeout" && isSetDay(selDate) && inSetWindow(selTime) && cartHasSetCombo();
 }
-function setEligibleDinein() {
-  if (mode !== "dinein") return false;
-  const now = new Date();
-  const ds = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  const ts = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  return isSetDay(ds) && inSetWindow(ts) && cartHasSetCombo();
-}
 function updateSetNotes() {
   const t = $("set-note");
   if (t) t.classList.toggle("hidden", !setEligibleTakeout());
-  const d = $("dinein-set-note");
-  if (d) d.classList.toggle("hidden", !setEligibleDinein());
 }
 
 const $ = id => document.getElementById(id);
@@ -708,7 +699,6 @@ async function submitDinein() {
     const orderNo = makeDineinNo();
     const ref = await addDoc(collection(db, "dineInOrders"), {
       orderNo, seat, seatLabel: seatLabel(seat),
-      setMeal: setEligibleDinein(),
       items, total: cartTotal(), totalQty: cartQty(),
       status: "pending",
       createdAt: serverTimestamp(),

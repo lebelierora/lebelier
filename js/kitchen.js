@@ -256,7 +256,6 @@ function dineinCardHtml(o) {
       <div class="pdate"><span class="kind-chip">店内</span> ／ ${esc(o.orderNo)} ／ ${stLabel}</div>
       <div class="ptime">${esc(o.seatLabel || seatLabel(o.seat))}</div>
     </div>
-    ${o.setMeal ? `<div class="setmeal-badge">平日セット対象：揚げ物をサービスで付ける</div>` : ""}
     <div>${itemsHtml(o)}</div>
     <div class="ktotal">合計 ${yen(o.total)}</div>
     ${isPending ? `
