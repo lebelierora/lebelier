@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js?v=20251125-59";
+import { db } from "./firebase-config.js?v=20251125-60";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,10 +7,10 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js?v=20251125-59";
+} from "./menu.js?v=20251125-60";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
-} from "./frozen-menu.js?v=20251125-59";
+} from "./frozen-menu.js?v=20251125-60";
 
 // 焼きピザ・冷凍ピザ両方のメニューから商品を引く
 const anyById = id => menuById(id) || frozenById(id);
@@ -88,7 +88,7 @@ function renderTabs() {
 }
 function renderGrid() {
   const items = (mode === "frozen" ? frozenItemsForCategory(currentCat) : itemsForCategory(currentCat))
-    .filter(m => !m.hidden && (mode === "dinein" || !m.dineInOnly)); // dineInOnly の商品は店内モードでのみ表示する／hidden の商品は常に出さない
+    .filter(m => !m.hidden && (mode === "dinein" || !m.dineInOnly) && (mode === "takeout" || !m.takeoutOnly)); // dineInOnly は店内のみ／takeoutOnly はテイクアウトのみ／hidden は常に出さない
   $("item-grid").innerHTML = items.map(m => `
     <button class="item" data-id="${m.id}">
       ${effImg(m) ? `<img src="${esc(effImg(m))}" alt="${esc(m.name)}" loading="lazy"${m.poster ? ` style="object-fit:contain;background:#f6efe3;"` : ""}>` : (m.img ? "" : `<div class="noimg">写真なし</div>`)}
@@ -542,7 +542,6 @@ function enterDinein() {
 }
 function enterDineinMenu() {
   $("dinein-seat-label").textContent = seatLabel(seat);
-  $("seat-change").classList.toggle("hidden", seatFixed);
   $("call-msg-order").textContent = "";
   renderTabs(); renderGrid();
   show("scr-order");
@@ -688,7 +687,6 @@ $("go-order").addEventListener("click", () => { setMode("takeout"); currentCat =
 $("go-frozen").addEventListener("click", () => { setMode("frozen"); currentCat = "fz-set"; renderTabs(); renderGrid(); show("scr-order"); });
 $("go-dinein").addEventListener("click", enterDinein);
 $("seat-back").addEventListener("click", () => { setMode("takeout"); show("scr-home"); });
-$("seat-change").addEventListener("click", () => { seat = null; renderSeatGrid(); show("scr-seat"); });
 $("dinein-back").addEventListener("click", () => show("scr-order"));
 $("submit-dinein").addEventListener("click", submitDinein);
 $("call-btn-order").addEventListener("click", () => callStaff($("call-msg-order")));
