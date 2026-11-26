@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js?v=20251125-42";
+import { db } from "./firebase-config.js?v=20251125-43";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,10 +7,10 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js?v=20251125-42";
+} from "./menu.js?v=20251125-43";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
-} from "./frozen-menu.js?v=20251125-42";
+} from "./frozen-menu.js?v=20251125-43";
 
 // 焼きピザ・冷凍ピザ両方のメニューから商品を引く
 const anyById = id => menuById(id) || frozenById(id);
@@ -163,6 +163,8 @@ function hasCutPack(item) { return CUT_PACK_CATS.includes(item.cat); }
 function detailUnit() { return unitPrice(detail.item, [...detail.toppings], detail.pack, detail.choice); }
 function renderDetail() {
   const it = detail.item;
+  // onlyChoice 付きトッピングは、その選択肢を選んだときだけ有効（例：ラテのアイストッピングはアイスのみ）。選択が合わなければ自動で外す
+  (it.toppings || []).forEach(t => { if (t.onlyChoice && detail.choice !== t.onlyChoice) detail.toppings.delete(t.label); });
   let html = `
     <div class="card" style="padding:0;overflow:hidden;">
       ${effImg(it) ? `<img src="${esc(effImg(it))}" alt="${esc(it.name)}" style="${it.poster ? "width:100%;aspect-ratio:3/4;object-fit:contain;background:#f6efe3;display:block;" : mode === "frozen" ? "width:100%;aspect-ratio:4/3;object-fit:contain;background:#f6efe3;display:block;" : "width:100%;aspect-ratio:1/1;object-fit:cover;display:block;"}">` : ""}
@@ -206,7 +208,11 @@ function renderDetail() {
       `</div>${detail.choice ? "" : `<div class="opt-note">お選びください（必須）</div>`}</div>`;
   }
   // dineInOnly のトッピングは店内モードでのみ表示する（テイクアウトでは出さない）
-  const visibleToppings = (it.toppings || []).filter(t => mode === "dinein" || !t.dineInOnly);
+  const visibleToppings = (it.toppings || []).filter(t => (mode === "dinein" || !t.dineInOnly) && (!t.onlyChoice || detail.choice === t.onlyChoice));
+  const choiceRestricted = (it.toppings || []).filter(t => t.onlyChoice && detail.choice !== t.onlyChoice);
+  if (!visibleToppings.length && choiceRestricted.length) {
+    html += `<div class="opt-group"><div class="opt-note">${esc(choiceRestricted.map(t => t.label).join("・"))}は${esc(choiceRestricted[0].onlyChoice)}のみです</div></div>`;
+  }
   if (visibleToppings.length) {
     html += `<div class="opt-group"><div class="label">トッピング・変更</div><div class="check-row">` +
       visibleToppings.map(t => `
