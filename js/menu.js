@@ -107,7 +107,7 @@ export const MENU = [
   { id: "smoked-chicken-slice", cat: "side", name: "スモークチキンスライス", img: "images/smoked-chicken-slice.jpg", price: 500, desc: "スモークチキンのスライス。", dineInOnly: true, toppings: [] },
   // ---- ソフトドリンク ----
   { id: "oolong", cat: "drink", name: "烏龍茶", img: "images/oolong.jpg", imgDineIn: "images/oolong-dinein.jpg", price: 350, desc: "", choice: { label: "ホット／アイスをお選びください", options: [{ label: "ホット", delta: 0 }, { label: "アイス", delta: 0 }] }, toppings: [{ label: "バニラアイストッピング", delta: 100, onlyChoice: "アイス" }] },
-  { id: "orange-juice", cat: "drink", name: "オレンジジュース", img: "images/orange-juice.jpg", price: 400, desc: "", toppings: [{ label: "バニラアイストッピング", delta: 100 }] },
+  { id: "orange-juice", cat: "drink", name: "オレンジジュース", img: "images/orange-juice.jpg", imgDineIn: "images/orange-juice-dinein.jpg", price: 400, desc: "", toppings: [{ label: "バニラアイストッピング", delta: 100 }] },
   { id: "hot-coffee", cat: "drink", name: "ホットコーヒー", img: "images/hot-coffee.jpg", imgDineIn: "images/hot-coffee-dinein.jpg", price: 400, desc: "イタリアンローストのコーヒーです。テイクアウト用コーヒーカップで提供致します。", descDineIn: "イタリアンローストのコーヒーです。", toppings: [{ label: "バニラアイストッピング", delta: 100 }] },
   { id: "ice-coffee", cat: "drink", name: "アイスコーヒー", img: "images/ice-coffee.jpg", imgDineIn: "images/ice-coffee-dinein.jpg", price: 450, desc: "イタリアンローストのアイスコーヒーです。", toppings: [{ label: "バニラアイストッピング", delta: 100 }] },
   { id: "cafe-latte", cat: "drink", name: "カフェラテ", img: "images/cafe-latte.jpg", imgDineIn: "images/cafe-latte-dinein.jpg", price: 450, desc: "イタリアンローストのカフェラテです。アイス・ホット選べます。", choice: { label: "ホット／アイスをお選びください", options: [{ label: "ホット", delta: 0 }, { label: "アイス", delta: 0 }] }, toppings: [{ label: "バニラアイストッピング", delta: 100, onlyChoice: "アイス" }] },
