@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>るべりえ 注文サイト</title>
-<link rel="stylesheet" href="css/style.css?v=20251125-83">
+<link rel="stylesheet" href="css/style.css?v=20251126-86">
 </head>
 <body>
 <div class="tricolor"></div>
@@ -131,6 +131,7 @@
     <h2 style="margin:14px 0 6px;">カート</h2>
     <div id="frozen-banner2" class="frozen-banner hidden">🧊 ご来店の際は、保冷バッグと保冷剤をご持参ください（冷凍ピザのお持ち帰り用です）</div>
     <div class="card" id="cart-list"></div>
+    <div id="set-note" class="set-note hidden">🍕 平日セットの時間帯です。揚げ物をサービスでお付けします。</div>
     <h2 style="margin:18px 0 6px;">受け取り日時</h2>
     <div class="field">
       <label>受け取り日</label>
@@ -183,6 +184,7 @@
     <button class="btn ghost small" id="dinein-back">← メニューに戻る</button>
     <h2 style="margin:14px 0 6px;">店内オーダーの確認</h2>
     <div class="card" style="font-size:17px;">お席：<strong id="dinein-checkout-seat"></strong></div>
+    <div id="dinein-set-note" class="set-note hidden">🍕 平日セットの時間帯です。揚げ物をサービスでお付けします。</div>
     <div class="card" id="dinein-cart-list"></div>
     <p class="note">送信すると厨房にすぐ届きます。お会計はお帰りの際にレジでお願いします。</p>
     <div id="dinein-error"></div>
@@ -231,6 +233,6 @@
 <!-- 通知帯（タップを遮らない） -->
 <div class="toast" id="toast"></div>
 
-<script type="module" src="js/customer.js?v=20251126-85"></script>
+<script type="module" src="js/customer.js?v=20251126-86"></script>
 </body>
 </html>

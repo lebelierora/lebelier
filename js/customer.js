@@ -6,7 +6,7 @@ import {
 import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes,
-  normalizePhone, esc, yen, SEATS, seatLabel,
+  normalizePhone, esc, yen, SEATS, seatLabel, toMin,
 } from "./menu.js?v=20251126-84";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
@@ -14,6 +14,53 @@ import {
 
 // 焼きピザ・冷凍ピザ両方のメニューから商品を引く
 const anyById = id => menuById(id) || frozenById(id);
+
+// ---- 平日ランチ・ディナーセット判定（ピザ＋ドリンクで揚げ物サービス。祝日・年末年始は無効＝本人決定 2026-11-26） ----
+const SET_PIZZA_CATS = ["hall", "age", "sweetpizza", "sweetage"];
+const SET_DRINK_CATS = ["drink", "alcohol"];
+const SET_HOLIDAYS = new Set([
+  "2026-01-01","2026-01-12","2026-02-11","2026-02-23","2026-03-20","2026-04-29","2026-05-03","2026-05-04","2026-05-05","2026-05-06","2026-07-20","2026-08-11","2026-09-21","2026-09-22","2026-09-23","2026-10-12","2026-11-03","2026-11-23",
+  "2027-01-01","2027-01-11","2027-02-11","2027-02-23","2027-03-21","2027-03-22","2027-04-29","2027-05-03","2027-05-04","2027-05-05","2027-07-19","2027-08-11","2027-09-20","2027-09-23","2027-10-11","2027-11-03","2027-11-23",
+]);
+function isSetDay(dateStr) {
+  if (!dateStr) return false;
+  const md = dateStr.slice(5);
+  if (["12-29","12-30","12-31","01-01","01-02","01-03"].includes(md)) return false; // 年末年始は無効
+  if (SET_HOLIDAYS.has(dateStr)) return false; // 祝日は無効
+  const wd = new Date(dateStr + "T12:00:00").getDay();
+  return [1, 2, 3, 5].includes(wd); // 月・火・水・金（木曜定休、土日は対象外）
+}
+function inSetWindow(timeStr) {
+  if (!timeStr) return false;
+  const m = toMin(timeStr);
+  return (m >= 660 && m < 840) || (m >= 1020 && m < 1200); // 11:00–14:00 / 17:00–20:00
+}
+function cartHasSetCombo() {
+  let pizza = false, drink = false;
+  for (const c of cart) {
+    const it = anyById(c.itemId);
+    if (!it) continue;
+    if (SET_PIZZA_CATS.includes(it.cat)) pizza = true;
+    if (SET_DRINK_CATS.includes(it.cat)) drink = true;
+  }
+  return pizza && drink;
+}
+function setEligibleTakeout() {
+  return mode === "takeout" && isSetDay(selDate) && inSetWindow(selTime) && cartHasSetCombo();
+}
+function setEligibleDinein() {
+  if (mode !== "dinein") return false;
+  const now = new Date();
+  const ds = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const ts = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  return isSetDay(ds) && inSetWindow(ts) && cartHasSetCombo();
+}
+function updateSetNotes() {
+  const t = $("set-note");
+  if (t) t.classList.toggle("hidden", !setEligibleTakeout());
+  const d = $("dinein-set-note");
+  if (d) d.classList.toggle("hidden", !setEligibleDinein());
+}
 
 const $ = id => document.getElementById(id);
 const screens = ["scr-home", "scr-seat", "scr-order", "scr-detail", "scr-checkout", "scr-dinein", "scr-done", "scr-status"];
@@ -342,6 +389,7 @@ function renderCart() {
       cart.splice(+b.dataset.del, 1); renderCart(); renderSlots(); updateCartbar(false);
     }));
   }
+  updateSetNotes();
 }
 function renderSlots() {
   const slots = timeSlots(selDate, cartQty());
@@ -361,7 +409,7 @@ function renderSlots() {
     ? (isThursday(selDate) ? "木曜日は定休日です。別の日をお選びください。" : "本日の受け取り枠は終了しました。別の日をお選びください。")
     : slots.every(s => occupiedTimes.has(s)) ? "この日の受け取り枠はすべて埋まっています。別の日をお選びください。" : "";
   $("slot-grid").querySelectorAll("button:not(:disabled)").forEach(b =>
-    b.addEventListener("click", () => { selTime = b.dataset.slot; renderSlots(); }));
+    b.addEventListener("click", () => { selTime = b.dataset.slot; renderSlots(); }));  updateSetNotes();
 }
 function openCheckout() {
   if (mode === "frozen") {
@@ -427,6 +475,7 @@ async function submitOrder() {
     const orderData = {
       orderNo, name, phone, note,
       kind: mode === "frozen" ? "frozen" : "takeout",
+      setMeal: setEligibleTakeout(),
       seal: mode === "frozen" ? sealChoice : null,
       items, total: cartTotal(), totalQty: cartQty(),
       pickupDate: selDate, requestedDate: selDate, pickupTime: selTime, requestedPickup: selTime,
@@ -627,6 +676,7 @@ function renderDineinCart() {
       cart.splice(+b.dataset.ddel, 1); renderDineinCart(); updateCartbar(false);
     }));
   }
+  updateSetNotes();
 }
 function openDineinCheckout() {
   $("dinein-checkout-seat").textContent = seatLabel(seat);
@@ -657,6 +707,7 @@ async function submitDinein() {
     const orderNo = makeDineinNo();
     const ref = await addDoc(collection(db, "dineInOrders"), {
       orderNo, seat, seatLabel: seatLabel(seat),
+      setMeal: setEligibleDinein(),
       items, total: cartTotal(), totalQty: cartQty(),
       status: "pending",
       createdAt: serverTimestamp(),

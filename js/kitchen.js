@@ -256,6 +256,7 @@ function dineinCardHtml(o) {
       <div class="pdate"><span class="kind-chip">店内</span> ／ ${esc(o.orderNo)} ／ ${stLabel}</div>
       <div class="ptime">${esc(o.seatLabel || seatLabel(o.seat))}</div>
     </div>
+    ${o.setMeal ? `<div class="setmeal-badge">平日セット対象：揚げ物をサービスで付ける</div>` : ""}
     <div>${itemsHtml(o)}</div>
     <div class="ktotal">合計 ${yen(o.total)}</div>
     ${isPending ? `
@@ -333,6 +334,7 @@ function cardHtml(o) {
     </div>
     <div>${regularBadge(o)} <strong style="font-size:18px;">${esc(o.name)} 様</strong>
       <a href="tel:${esc(o.phone)}" style="font-weight:800;">${esc(o.phone)}</a></div>
+    ${o.setMeal ? `<div class="setmeal-badge">平日セット対象：揚げ物をサービスで付ける</div>` : ""}
     ${o.note ? `<div class="kcustom">備考：${esc(o.note)}</div>` : ""}
     ${o.kind === "frozen" && o.seal ? `<div class="kcustom" style="font-weight:900;${o.seal === "none" ? "color:#c0392b;" : ""}">温め方シール：${o.seal === "none" ? "不要（貼らない）" : "必要（各商品に貼る）"}</div>` : ""}
     <div>${itemsHtml(o)}</div>
