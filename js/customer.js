@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js?v=20251125-76";
+import { db } from "./firebase-config.js?v=20251125-77";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,10 +7,10 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js?v=20251125-76";
+} from "./menu.js?v=20251125-77";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
-} from "./frozen-menu.js?v=20251125-76";
+} from "./frozen-menu.js?v=20251125-77";
 
 // 焼きピザ・冷凍ピザ両方のメニューから商品を引く
 const anyById = id => menuById(id) || frozenById(id);
@@ -175,7 +175,7 @@ function renderDetail() {
       </div>
     </div>`;
   if (hasCutPack(it)) {
-    const boxDisabledByCut = detail.cut === "cut4";
+    const boxDisabledByCut = detail.cut === "cut4" || detail.cut === "cut6";
     const boxDisabled = it.noBox || boxDisabledByCut;
     if (mode === "dinein" && it.noCutDineIn) {
       detail.cut = "nocut";
@@ -190,7 +190,7 @@ function renderDetail() {
       <div class="label">カット</div>
       <div class="opt-row">
         <button id="cut-nocut" class="${detail.cut === "nocut" ? "active" : ""}">未カット</button>
-        <button id="cut-cut4" class="${detail.cut === "cut4" ? "active" : ""}" ${detail.pack === "box" ? "disabled" : ""}>4カット</button>
+        <button id="cut-cut4" class="${detail.cut === "cut4" ? "active" : ""}" ${detail.pack === "box" ? "disabled" : ""}>4カット</button>${mode === "dinein" && (it.cat === "hall" || it.cat === "sweetpizza") ? `<button id="cut-cut6" class="${detail.cut === "cut6" ? "active" : ""}">6カット</button>` : ""}
       </div>
       ${detail.pack === "box" ? `<div class="opt-note">箱はカットなしのお渡しです</div>` : ""}
     </div>`;
@@ -242,6 +242,8 @@ function renderDetail() {
   if (hasCutPack(it) && $("cut-nocut")) {
     $("cut-nocut").addEventListener("click", () => { detail.cut = "nocut"; renderDetail(); });
     $("cut-cut4").addEventListener("click", () => { detail.cut = "cut4"; if (detail.pack === "box") detail.pack = "paper"; renderDetail(); });
+    const cut6Btn = $("cut-cut6");
+    if (cut6Btn) cut6Btn.addEventListener("click", () => { detail.cut = "cut6"; renderDetail(); });
     const paperBtn = $("pack-paper");
     if (paperBtn) paperBtn.addEventListener("click", () => { detail.pack = "paper"; renderDetail(); });
     const boxBtn = $("pack-box");
@@ -312,7 +314,7 @@ function renderCart() {
     $("cart-list").innerHTML = cart.map((c, i) => {
       const it = anyById(c.itemId);
       const custom = [
-        c.cut ? (c.cut === "cut4" ? "4カット" : "未カット") : null,
+        c.cut ? (c.cut === "cut4" ? "4カット" : c.cut === "cut6" ? "6カット" : "未カット") : null,
         c.pack ? (c.pack === "box" ? "箱（+100円）" : "紙皿・ホイル") : null,
         c.choice || null,
         ...(c.toppings || []),
@@ -526,7 +528,7 @@ function searchStatus() {
         ${o.status === "confirmed" && o.confirmedPickup && o.confirmedPickup !== o.requestedPickup
           ? `<p style="font-weight:800;color:var(--warn);margin:4px 0;">受け取り時刻が ${esc(o.confirmedPickup)} に変更になりました</p>` : ""}
         <div style="margin-top:8px;">${(o.items || []).map(i => {
-          const custom = [i.cut ? (i.cut === "cut4" ? "4カット" : "未カット") : null,
+          const custom = [i.cut ? (i.cut === "cut4" ? "4カット" : i.cut === "cut6" ? "6カット" : "未カット") : null,
                           i.pack ? (i.pack === "box" ? "箱" : "紙皿・ホイル") : null,
                           i.choice || null,
                           ...(i.toppings || [])].filter(Boolean).join("／");
@@ -562,7 +564,7 @@ function renderDineinCart() {
     $("dinein-cart-list").innerHTML = cart.map((c, i) => {
       const it = anyById(c.itemId);
       const custom = [
-        c.cut ? (c.cut === "cut4" ? "4カット" : "未カット") : null,
+        c.cut ? (c.cut === "cut4" ? "4カット" : c.cut === "cut6" ? "6カット" : "未カット") : null,
         c.choice || null,
         ...(c.toppings || []),
       ].filter(Boolean).join("／");
