@@ -249,9 +249,13 @@ function renderDetail() {
     }
   }
   const choiceVisible = it.choice && (mode === "dinein" || !it.choice.dineInOnly); // dineInOnly の choice は店内のみ（例：生ビールの小サイズ）
+  // 選択肢単位の dineInOnly（例：烏龍茶のホットは店内のみ。テイクアウトはアイスのみ）
+  const visibleOptions = choiceVisible ? it.choice.options.filter(o => mode === "dinein" || !o.dineInOnly) : [];
   if (choiceVisible) {
+    if (detail.choice && !visibleOptions.some(o => o.label === detail.choice)) detail.choice = null;
+    if (!detail.choice && visibleOptions.length === 1) detail.choice = visibleOptions[0].label; // 残り1つなら自動選択
     html += `<div class="opt-group"><div class="label">${esc(it.choice.label)}</div><div class="opt-row">` +
-      it.choice.options.map(o => `
+      visibleOptions.map(o => `
         <button data-choice="${esc(o.label)}" class="${detail.choice === o.label ? "active" : ""}">${esc(o.label)}${o.delta ? ` <span style="color:var(--red-dark);">${o.delta > 0 ? "+" : "−"}${yen(Math.abs(o.delta))}</span>` : ""}</button>`).join("") +
       `</div>${detail.choice ? "" : `<div class="opt-note">お選びください（必須）</div>`}</div>`;
   }
