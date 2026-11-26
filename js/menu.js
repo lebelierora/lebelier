@@ -98,7 +98,7 @@ export const MENU = [
   { id: "zensai-moriawase", cat: "side", name: "前菜盛り合わせ", img: "images/zensai-moriawase.jpg", price: 1300, desc: "いろいろな味を少しずつ。みんなでシェアするのにぴったりの盛り合わせです。※内容は季節によって変更する場合があります。人数によってお作りいたしますのでご相談ください。", dineInOnly: true, toppings: [] },
   { id: "pizza-sandwich", cat: "side", name: "ピッツァサンドイッチ", img: "images/pizza-sandwich.jpg", price: 800, desc: "ピザ生地で作った新感覚サンドイッチ。香味野菜・生ハム・トマト・マスカルポーネ・フランス産マスタード・ペコリーノ。", dineInOnly: true, poster: true, toppings: [] },
   { id: "kunsei-mozzarella", cat: "side", name: "燻製モッツァレラチーズ", img: "images/kunsei-mozzarella.jpg", price: 500, desc: "燻製モッツァレラチーズ。", dineInOnly: true, toppings: [] },
-  { id: "caprese", cat: "side", name: "カプレーゼ", img: "images/caprese.jpg", price: 500, desc: "トマトとモッツァレラチーズのカプレーゼ。", dineInOnly: true, toppings: [] },
+  { id: "caprese", cat: "side", name: "カプレーゼ", img: "images/caprese.jpg", imgDineIn: "images/caprese-dinein.jpg", price: 500, desc: "トマトとモッツァレラチーズのカプレーゼ。", dineInOnly: true, toppings: [] },
   { id: "grill-sausage", cat: "side", name: "グリルソーセージ", img: "images/grill-sausage.jpg", price: 400, desc: "グリルソーセージ。4本から、本数をお選びください（1本追加ごとに+100円）。", dineInOnly: true, choice: { label: "本数をお選びください", options: [{ label: "4本", delta: 0 }, { label: "5本", delta: 100 }, { label: "6本", delta: 200 }, { label: "7本", delta: 300 }, { label: "8本", delta: 400 }] }, toppings: [] },
   { id: "milano-salami", cat: "side", name: "ミラノサラミ", img: "images/milano-salami.jpg", price: 550, desc: "ミラノサラミ。", dineInOnly: true, toppings: [] },
   { id: "prosciutto", cat: "side", name: "生ハム プロシュート", img: "images/prosciutto.jpg", price: 680, desc: "生ハム プロシュート。", dineInOnly: true, toppings: [] },
