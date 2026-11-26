@@ -119,7 +119,7 @@ export const MENU = [
   { id: "cocoa", cat: "drink", name: "人生のように甘過ぎないココア", img: "images/cocoa.jpg", imgDineIn: "images/cocoa-dinein.jpg", price: 450, desc: "テイクアウト用コーヒーカップで提供致します。", descDineIn: "", toppings: [] },
   { id: "zero-ichi", cat: "drink", name: "キリンゼロイチ ノンアルコールビール", img: "images/zero-ichi.jpg", price: 400, desc: "", toppings: [] },
   { id: "peche-oolong", cat: "drink", name: "ペシェウーロン（桃味）", img: "images/peche-oolong.jpg", imgDineIn: "images/peche-oolong-dinein.jpg", price: 400, desc: "ピーチシロップを烏龍茶で割った飲み物です。", toppings: [{ label: "バニラアイストッピング", delta: 100 }] },
-  { id: "tropical-oolong", cat: "drink", name: "トロピカルウーロン（パッション味）", img: "images/tropical-oolong.jpg", price: 400, desc: "パッションシロップを烏龍茶で割った飲み物です。", toppings: [{ label: "バニラアイストッピング", delta: 100 }] },
+  { id: "tropical-oolong", cat: "drink", name: "トロピカルウーロン（パッション味）", img: "images/tropical-oolong.jpg", imgDineIn: "images/tropical-oolong-dinein.jpg", price: 400, desc: "パッションシロップを烏龍茶で割った飲み物です。", toppings: [{ label: "バニラアイストッピング", delta: 100 }] },
   // ---- アルコール ----
   { id: "heartland-draft", cat: "alcohol", name: "キリンハートランド生ビール", img: "images/heartland-draft.jpg", price: 600, desc: "プラカップで提供致します。", imgDineIn: "images/heartland-draft-dinein.jpg", descDineIn: "ゴブレットで提供致します。", choice: { label: "サイズをお選びください", dineInOnly: true, options: [{ label: "通常", delta: 0 }, { label: "小（ちビール）", delta: -110 }] }, toppings: [] },
   { id: "house-wine", cat: "alcohol", name: "ハウスワイン", img: "images/house-wine.jpg", price: 500, desc: "プラカップで提供致します。", descDineIn: "", choice: { label: "赤／白をお選びください", options: [{ label: "赤ワイン", delta: 0 }, { label: "白ワイン", delta: 0 }] }, toppings: [] },
