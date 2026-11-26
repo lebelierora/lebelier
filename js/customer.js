@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js?v=20251125-74";
+import { db } from "./firebase-config.js?v=20251125-75";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,10 +7,10 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js?v=20251125-74";
+} from "./menu.js?v=20251125-75";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
-} from "./frozen-menu.js?v=20251125-74";
+} from "./frozen-menu.js?v=20251125-75";
 
 // 焼きピザ・冷凍ピザ両方のメニューから商品を引く
 const anyById = id => menuById(id) || frozenById(id);
@@ -93,7 +93,7 @@ function renderGrid() {
     <button class="item" data-id="${m.id}">
       ${effImg(m) ? `<img src="${esc(effImg(m))}" alt="${esc(m.name)}" loading="lazy"${m.poster ? ` style="object-fit:contain;background:#f6efe3;"` : ""}>` : (m.img ? "" : `<div class="noimg">写真なし</div>`)}
       <div class="body">
-        <div class="name">${esc(m.name)}${m.seasonal ? ` <span class="season-badge">季節</span>` : ""}</div>
+        <div class="name">${esc(m.name)}${m.seasonal ? ` <span class="season-badge">季節</span>` : ""}${m.eatInBadge ? ` <span class="eatin-badge">イートイン限定</span>` : ""}</div>
         <!-- 一覧では説明文を表示しない（本人指示 2026-11-25：見づらいため。説明は詳細画面のみ） -->
         <div class="price">${yen(m.price)}${m.choice && m.choice.options.some(o => o.delta > 0) ? "〜" : ""}</div>
       </div>
@@ -169,7 +169,7 @@ function renderDetail() {
     <div class="card" style="padding:0;overflow:hidden;">
       ${effImg(it) ? `<img src="${esc(effImg(it))}" alt="${esc(it.name)}" style="${it.poster ? "width:100%;aspect-ratio:3/4;object-fit:contain;background:#f6efe3;display:block;" : mode === "frozen" ? "width:100%;aspect-ratio:4/3;object-fit:contain;background:#f6efe3;display:block;" : "width:100%;aspect-ratio:1/1;object-fit:cover;display:block;"}">` : ""}
       <div style="padding:14px;">
-        <div style="font-size:20px;font-weight:900;">${esc(it.name)}${it.seasonal ? ` <span class="season-badge">季節メニュー</span>` : ""}</div>
+        <div style="font-size:20px;font-weight:900;">${esc(it.name)}${it.seasonal ? ` <span class="season-badge">季節メニュー</span>` : ""}${it.eatInBadge ? ` <span class="eatin-badge">イートイン限定</span>` : ""}</div>
         ${descHtml(it)}
         <div style="font-weight:900;font-size:19px;margin-top:8px;">${yen(it.price)}</div>
       </div>
