@@ -2,13 +2,13 @@
 // テスト段階の簡易保護として PIN ゲートを使う（本番前に Firebase Auth へ移行すること）。
 const KITCHEN_PIN = "2321"; // テスト用PIN（店の電話番号の下4桁）
 
-import { db } from "./firebase-config.js?v=20251125-82";
+import { db } from "./firebase-config.js?v=20251125-83";
 import {
   collection, onSnapshot, query, where, doc, updateDoc, setDoc, deleteDoc, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   todayKey, addDays, isThursday, formatDateJP, lastSlot, toMin, toHHMM, occupiedTime, esc, yen, seatLabel,
-} from "./menu.js?v=20251125-82";
+} from "./menu.js?v=20251125-83";
 
 const $ = id => document.getElementById(id);
 
@@ -179,19 +179,21 @@ function finishedDinein() {
   return dineinOrders.filter(o => o.status === "done")
     .sort((a, b) => tsMillis(b.createdAt) - tsMillis(a.createdAt));
 }
-// 店内＋テイクアウトの統合表示リスト（タブで絞り込み、時刻順に混ぜて並べる）
+// 店内＋テイクアウトの統合表示リスト（タブで絞り込み）
+// 未受付（pending）は常に先頭に固定し、来た順に並べる。受付済みは受け取り時刻順（店内は注文順）。
 function displayActive() {
   const list = [];
+  const push = (kind, o, key) => list.push({ kind, o, key, pend: o.status === "pending" ? 0 : 1, pkey: tsSortKey(o.createdAt) });
   if (tabFilter === "frozen") {
     for (const o of activeOrders().filter(o => o.kind === "frozen"))
-      list.push({ kind: "takeout", o, key: o.pickupDate + " " + (o.confirmedPickup || o.requestedPickup) });
+      push("takeout", o, o.pickupDate + " " + (o.confirmedPickup || o.requestedPickup));
   } else if (tabFilter !== "dinein") {
     for (const o of activeOrders().filter(o => tabFilter !== "takeout" || o.kind !== "frozen"))
-      list.push({ kind: "takeout", o, key: o.pickupDate + " " + (o.confirmedPickup || o.requestedPickup) });
+      push("takeout", o, o.pickupDate + " " + (o.confirmedPickup || o.requestedPickup));
   }
   if (tabFilter !== "takeout" && tabFilter !== "frozen")
-    for (const o of activeDinein()) list.push({ kind: "dinein", o, key: tsSortKey(o.createdAt) });
-  return list.sort((a, b) => a.key.localeCompare(b.key));
+    for (const o of activeDinein()) push("dinein", o, tsSortKey(o.createdAt));
+  return list.sort((a, b) => (a.pend - b.pend) || (a.pend === 0 ? a.pkey.localeCompare(b.pkey) : a.key.localeCompare(b.key)));
 }
 function displayFinished() {
   const list = [];
