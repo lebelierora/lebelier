@@ -104,7 +104,7 @@ export const MENU = [
   { id: "prosciutto", cat: "side", name: "生ハム プロシュート", img: "images/prosciutto.jpg", price: 680, desc: "生ハム プロシュート。", dineInOnly: true, toppings: [] },
   { id: "coppa", cat: "side", name: "コッパ（豚肩ロースハム）", img: "images/coppa.jpg", price: 580, desc: "コッパ（豚肩ロースハム）。", dineInOnly: true, toppings: [] },
   { id: "speck", cat: "side", name: "スペック（燻製生ハム）", img: "images/speck.jpg", price: 580, desc: "スペック（燻製生ハム）。", dineInOnly: true, toppings: [] },
-  { id: "smoked-chicken-slice", cat: "side", name: "スモークチキンスライス", img: "images/smoked-chicken-slice.jpg", price: 500, desc: "スモークチキンのスライス。", dineInOnly: true, toppings: [] },
+  { id: "smoked-chicken-slice", cat: "side", name: "スモークチキンスライス", img: "images/smoked-chicken-slice.jpg", imgDineIn: "images/smoked-chicken-dinein.jpg", price: 500, desc: "スモークチキンのスライス。", dineInOnly: true, toppings: [] },
   // ---- ソフトドリンク ----
   { id: "oolong", cat: "drink", name: "烏龍茶", img: "images/oolong.jpg", imgDineIn: "images/oolong-dinein.jpg", price: 350, desc: "", choice: { label: "ホット／アイスをお選びください", options: [{ label: "ホット", delta: 0 }, { label: "アイス", delta: 0 }] }, toppings: [{ label: "バニラアイストッピング", delta: 100, onlyChoice: "アイス" }] },
   { id: "orange-juice", cat: "drink", name: "オレンジジュース", img: "images/orange-juice.jpg", imgDineIn: "images/orange-juice-dinein.jpg", price: 400, desc: "", toppings: [{ label: "バニラアイストッピング", delta: 100 }] },
