@@ -128,7 +128,7 @@ export const MENU = [
   { id: "oharaki", cat: "alcohol", name: "邑楽館林の地酒 於波良岐（おはらき）", img: "images/oharaki.jpg", price: 500, desc: "プラカップで提供致します。", descDineIn: "", toppings: [] },
   { id: "campari-beer", cat: "alcohol", name: "カンパリビア", img: "images/campari-beer.jpg", price: 700, desc: "キリンハートランド生ビールにカンパリを合わせたお酒です。プラカップで提供致します。", descDineIn: "キリンハートランド生ビールにカンパリを合わせたお酒です。", toppings: [] },
   { id: "highball", cat: "alcohol", name: "角ハイボール", img: "images/highball.jpg", price: 500, desc: "定番ハイボール", dineInOnly: true, toppings: [] },
-  { id: "hot-wine", cat: "alcohol", name: "ホットワイン", img: "images/hot-wine.jpg", price: 500, desc: "テイクアウト用コーヒーカップで提供致します。", descDineIn: "", choice: { label: "赤／白をお選びください", options: [{ label: "赤ワインベース", delta: 0 }, { label: "白ワインベース", delta: 0 }] }, toppings: [] },
+  { id: "hot-wine", cat: "alcohol", name: "ホットワイン", img: "images/hot-wine.jpg", imgDineIn: "images/hot-wine-dinein.jpg", price: 500, desc: "テイクアウト用コーヒーカップで提供致します。", descDineIn: "", choice: { label: "赤／白をお選びください", options: [{ label: "赤ワインベース", delta: 0 }, { label: "白ワインベース", delta: 0 }] }, toppings: [] },
   { id: "wee-bee", cat: "alcohol", name: "ウィービー", img: "images/wee-bee.jpg", price: 700, desc: "ハートランド×角ウイスキー。ハートランドの爽やかさに、角ウイスキーのコクをプラス。祖父がよく飲んでいた一杯。", dineInOnly: true, poster: true, toppings: [] },
   { id: "bottle-beer", cat: "alcohol", name: "キリンハートランド瓶ビール", price: 700, desc: "キリンハートランドの瓶ビール。", dineInOnly: true, toppings: [] },
   { id: "bottle-wine", cat: "alcohol", name: "ボトルワイン", price: 1800, desc: "ボトルワインです。赤・白からお選びください。", dineInOnly: true, choice: { label: "赤／白をお選びください", options: [{ label: "赤ワイン", delta: 0 }, { label: "白ワイン", delta: 0 }] }, toppings: [] },
