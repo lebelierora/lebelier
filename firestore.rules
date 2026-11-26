@@ -1,69 +1,44 @@
 rules_version = '2';
 
 // ============================================================
-// るべりえ 注文サイト（lebelier／テイクアウト・店内）Firestore セキュリティルール
-//
-// 現状は「誰でも読み書き可」に近い緩い設定です。理由：
-// - お客さん側はログインなしで注文・状況確認を行うため
-// - 厨房画面はテスト段階では PIN ゲート（クライアント側）で守るため
-// テスト公開中のみの前提です。本番運用の前に、必ず下記の締め付けを行うこと。
-//
-//
-// 1. 厨房側を Firebase Authentication（メール/パスワード等）で認証し、
-// takeoutOrders の「更新（受付・完了・来店なし）」と blockedPhones の
-// 書き込みは request.auth!= null のユーザーだけに許可する。
-// 2. takeoutOrders の読み取りは、電話番号＋受け取り日でのクエリに限定し、
-// 全件読み取りを禁止する（現状は厨房の全件購読と状況確認のため全読み可）。
-// ※ Firestore ルールだけでは「自分の注文だけ」を厳密には守れないため、
-// 本番では App Check の導入、または Cloud Functions 経由の取得に移行する。
-// 3. create 時のフィールド検証（必須項目・型・金額の上限・文字列長）を追加し、
-// いたずらの大量書き込みを防ぐ。あわせて Firebase App Check を有効化する。
-// 4. blockedPhones の読み取りは「自分の番号が含まれているか」の判定だけに
-// 使うため、本番では存在確認専用の仕組み（Functions等）に分離する。
-// 5. 店内注文（dineInOrders）と呼び出し（calls）も同様に、本番では厨房側の
-// 更新（受付・提供済み・対応した）を認証済みユーザーだけに許可し、create 時の
-// フィールド検証（席IDが実在すること・数量と金額の上限・文字列長）を追加する。
-// あわせて App Check を有効化し、calls の削除は管理者のみに限定する
-// （対応済みの履歴を残す運用にする場合は update のみに切り替える）。
+// るべりえ 注文サイト（lebelier）Firestore セキュリティルール
+// 2026-11-26：厨房を Firebase Auth（メール/パスワード）化し、本ルールへ締め付け。
+// 厨房アカウントは lebelier.ora@gmail.com の1件だけ（isKitchen で判定）。
+// お客様はログインなし：注文の作成と、IDを知っている自分の注文の取得だけ可。
 // ============================================================
-
 service cloud.firestore {
-match /databases/{database}/documents {
-
-// テイクアウト注文
-match /takeoutOrders/{orderId} {
-allow read: if true; // テスト段階：状況確認・厨房購読のため全読み可
-allow create: if true; // テスト段階：ログインなし注文のため
-allow update: if true; // テスト段階：厨房の受付操作（PINゲート前提）
-allow delete: if false; // 削除は誰にも許可しない
-}
-
-// 店内注文
-match /dineInOrders/{orderId} {
-allow read: if true; // テスト段階：お客さんの受付状況表示・厨房購読のため全読み可
-allow create: if true; // テスト段階：ログインなし注文のため
-allow update: if true; // テスト段階：厨房の受付操作（PINゲート前提）
-allow delete: if false; // 削除は誰にも許可しない
-}
-
-// 呼び出し（店内のお客さん→厨房）
-// status: "open"（未対応）→ 厨房が「対応した」で "done" に更新する
-match /calls/{callId} {
-allow read: if true; // テスト段階：厨房の購読のため
-allow create: if true; // テスト段階：お客さんの呼び出し送信のため
-allow update, delete: if true; // テスト段階：厨房の対応処理（PINゲート前提）
-}
-
-// 要注意リスト（ノーショーした電話番号）
-// ドキュメントID = 電話番号（数字のみ）
-match /blockedPhones/{phone} {
-allow read: if true; // テスト段階：注文送信時の判定のため
-allow create, update, delete: if true; // テスト段階：厨房の登録・解除（PINゲート前提）
-}
-
-// それ以外のコレクションはすべて拒否
-match /{document=**} {
-allow read, write: if false;
-}
-}
+  match /databases/{database}/documents {
+    function isKitchen() {
+      return request.auth != null && request.auth.token.email == "lebelier.ora@gmail.com";
+    }
+    // テイクアウト・冷凍の注文：お客様は「作成」と「自分の注文（IDを知っているもの）の取得」のみ。
+    // 全件の閲覧・更新・削除は厨房ログインだけ。
+    match /takeoutOrders/{id} {
+      allow create: if true;
+      allow get: if true;
+      allow list, update, delete: if isKitchen();
+    }
+    // 店内オーダー：同上
+    match /dineInOrders/{id} {
+      allow create: if true;
+      allow get: if true;
+      allow list, update, delete: if isKitchen();
+    }
+    // 店員呼び出し：お客様は作成のみ
+    match /calls/{id} {
+      allow create: if true;
+      allow get, list, update, delete: if isKitchen();
+    }
+    // 要注意リスト：お客様は自分の番号の登録有無だけ取得可（ID＝電話番号）
+    match /blockedPhones/{id} {
+      allow get: if true;
+      allow list, create, update, delete: if isKitchen();
+    }
+    // 受け取り枠の日次サマリ：お客様が枠を取り、厨房が動かす/空ける
+    match /daySlots/{date} {
+      allow get: if true;
+      allow create, update: if true;
+      allow delete: if isKitchen();
+    }
+  }
 }

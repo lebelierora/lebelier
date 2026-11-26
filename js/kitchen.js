@@ -1,29 +1,34 @@
 // 厨房受付ロジック：テイクアウト注文＋店内オーダーのリアルタイム表示・受付・完了・呼び出し対応・ブロック管理
-// テスト段階の簡易保護として PIN ゲートを使う（本番前に Firebase Auth へ移行すること）。
-const KITCHEN_PIN = "2321"; // テスト用PIN（店の電話番号の下4桁）
+// ログインは Firebase Auth（メールアドレス＋パスワード）。データ保護は Firestore ルール側で行う。
 
-import { db } from "./firebase-config.js?v=20251125-83";
+import { db, auth } from "./firebase-config.js?v=20251126-84";
 import {
-  collection, onSnapshot, query, where, doc, updateDoc, setDoc, deleteDoc, serverTimestamp,
+  collection, onSnapshot, query, where, doc, updateDoc, setDoc, deleteDoc, deleteField, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
+  signInWithEmailAndPassword, onAuthStateChanged, signOut,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
   todayKey, addDays, isThursday, formatDateJP, lastSlot, toMin, toHHMM, occupiedTime, esc, yen, seatLabel,
-} from "./menu.js?v=20251125-83";
+} from "./menu.js?v=20251126-84";
 
 const $ = id => document.getElementById(id);
 
-// ---------- PIN ----------
-if (sessionStorage.getItem("ruberie_kitchen") === "ok") openKitchen();
-$("pin-btn").addEventListener("click", tryPin);
-$("pin-input").addEventListener("keydown", e => { if (e.key === "Enter") tryPin(); });
-function tryPin() {
-  if ($("pin-input").value === KITCHEN_PIN) {
-    sessionStorage.setItem("ruberie_kitchen", "ok");
-    openKitchen();
-  } else {
-    $("pin-error").innerHTML = `<div class="err" style="margin-top:10px;">PINが違います。</div>`;
+// ---------- ログイン（Firebase Auth） ----------
+let kitchenOpen = false;
+$("login-btn").addEventListener("click", tryLogin);
+$("login-pass").addEventListener("keydown", e => { if (e.key === "Enter") tryLogin(); });
+async function tryLogin() {
+  $("login-error").innerHTML = "";
+  try {
+    await signInWithEmailAndPassword(auth, $("login-email").value.trim(), $("login-pass").value);
+  } catch (e) {
+    console.error(e);
+    $("login-error").innerHTML = `<div class="err" style="margin-top:10px;">ログインできませんでした。メールアドレスとパスワードをご確認ください。</div>`;
   }
 }
+onAuthStateChanged(auth, user => { if (user) openKitchen(); });
+$("logout-btn").addEventListener("click", async () => { await signOut(auth); location.reload(); });
 
 // ---------- 状態 ----------
 let orders = [];        // takeoutOrders のスナップショット（全件→表示対象を抽出）
@@ -41,9 +46,28 @@ let startedDinein = false;
 let startedCalls = false;
 
 function openKitchen() {
+  if (kitchenOpen) return;
+  kitchenOpen = true;
   $("pin-gate").classList.add("hidden");
   $("kitchen-main").classList.remove("hidden");
   startListeners();
+}
+
+// ---------- 受け取り枠（daySlots）の保守 ----------
+// 焼きピザの「1枠1注文」は日次サマリ daySlots/{日付}.taken{時刻: 注文番号} で管理する。
+// お客様側が注文時に枠を取り、厨房側は確定時刻の変更・お渡し済み・来店なしで枠を動かす/空ける。
+async function freeSlot(o) {
+  if (!o || o.kind === "frozen") return;
+  const date = o.confirmedDate || o.pickupDate;
+  const time = o.confirmedPickup || o.requestedPickup;
+  if (!date || !time) return;
+  try { await updateDoc(doc(db, "daySlots", date), { [`taken.${time}`]: deleteField() }); }
+  catch (e) { console.error("枠の解放に失敗", e); }
+}
+async function takeSlot(o, date, time) {
+  if (!o || o.kind === "frozen" || !date || !time) return;
+  try { await setDoc(doc(db, "daySlots", date), { taken: { [time]: o.orderNo } }, { merge: true }); }
+  catch (e) { console.error("枠の確保に失敗", e); }
 }
 
 function startListeners() {
@@ -387,10 +411,21 @@ function bindCardButtons() {
       upd.confirmedDate = newDate;
     }
     await updateDoc(doc(db, "takeoutOrders", o.id), upd);
+    if (o.kind !== "frozen") {
+      const oldDate = o.confirmedDate || o.pickupDate;
+      const oldTime = o.confirmedPickup || o.requestedPickup;
+      const newDate = upd.pickupDate || oldDate;
+      if (oldDate !== newDate || oldTime !== upd.confirmedPickup) {
+        await freeSlot(o);
+        await takeSlot(o, newDate, upd.confirmedPickup);
+      }
+    }
   }));
   document.querySelectorAll("[data-done]").forEach(b => b.addEventListener("click", async () => {
+    const o = orders.find(x => x.id === b.dataset.done);
     b.disabled = true;
     await updateDoc(doc(db, "takeoutOrders", b.dataset.done), { status: "done", doneAt: serverTimestamp() });
+    if (o) await freeSlot(o);
   }));
   document.querySelectorAll("[data-noshow]").forEach(b => b.addEventListener("click", async () => {
     const o = orders.find(x => x.id === b.dataset.noshow);
@@ -398,6 +433,7 @@ function bindCardButtons() {
     if (!confirm(`${o.name} 様の注文を「来店なし」にして、この電話番号を要注意リストに登録しますか？`)) return;
     b.disabled = true;
     await updateDoc(doc(db, "takeoutOrders", o.id), { status: "noshow", noshowAt: serverTimestamp() });
+    await freeSlot(o);
     await setDoc(doc(db, "blockedPhones", o.phone), {
       phone: o.phone, name: o.name, reason: "来店なし", createdAt: serverTimestamp(),
     });

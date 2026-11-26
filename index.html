@@ -19,7 +19,6 @@
   <section id="scr-home">
     <div class="logo-banner"><img src="images/logo.jpg" alt="るべりえ ロゴ"></div>
     <button class="btn" id="go-order" style="margin-bottom:12px;">テイクアウト注文をする</button>
-    <button class="btn" id="go-dinein" style="margin-bottom:12px;">店内オーダー（お席から注文）</button>
     <button class="btn" id="go-frozen" style="margin-bottom:12px;">冷凍ピザの店頭予約（翌々日〜1週間先）</button>
     <button class="btn ghost" id="go-status">注文状況を見る</button>
     <div class="card" style="margin-top:16px;">
@@ -210,16 +209,11 @@
   <section id="scr-status" class="hidden">
     <button class="btn ghost small" id="status-back">← トップに戻る</button>
     <h2 style="margin:14px 0 6px;">注文状況を見る</h2>
-    <p class="note">受け取り日と、注文時に入力した電話番号で、ご注文の状況を確認できます。注文番号は不要です。</p>
+    <p class="note">この端末で注文した内容が、受け取り日ごとに表示されます。</p>
     <div class="field">
       <label>受け取り日</label>
       <div class="date-chips" id="status-date-chips"></div>
     </div>
-    <div class="field">
-      <label for="status-phone">電話番号</label>
-      <input id="status-phone" type="tel" autocomplete="tel" placeholder="例：09012345678">
-    </div>
-    <button class="btn" id="status-search">状況を確認する</button>
     <p class="note" style="margin-top:8px;">確認待ちの間は自動で更新しています。</p>
     <div class="card" style="margin-top:12px;">
       <p class="note" style="margin:0;">ご注文のキャンセル・変更は、お電話でお願いします（<a href="tel:0276702321">0276-70-2321</a>）</p>
@@ -237,6 +231,6 @@
 <!-- 通知帯（タップを遮らない） -->
 <div class="toast" id="toast"></div>
 
-<script type="module" src="js/customer.js?v=20251125-83"></script>
+<script type="module" src="js/customer.js?v=20251126-84"></script>
 </body>
 </html>

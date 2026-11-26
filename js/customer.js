@@ -1,16 +1,16 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js?v=20251125-83";
+import { db } from "./firebase-config.js?v=20251126-84";
 import {
-  collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
+  collection, addDoc, doc, getDoc, onSnapshot, runTransaction, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
-  todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
+  todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js?v=20251125-83";
+} from "./menu.js?v=20251126-84";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
-} from "./frozen-menu.js?v=20251125-83";
+} from "./frozen-menu.js?v=20251126-84";
 
 // 焼きピザ・冷凍ピザ両方のメニューから商品を引く
 const anyById = id => menuById(id) || frozenById(id);
@@ -280,9 +280,8 @@ let submitting = false;        // 注文送信中は、自分の注文で枠が�
 function watchSlots() {
   unwatchSlots();
   occupiedTimes = new Set();
-  const q = query(collection(db, "takeoutOrders"), where("pickupDate", "==", selDate));
-  slotSub = onSnapshot(q, snap => {
-    occupiedTimes = occupiedSlots(snap.docs.map(d => d.data()), selDate);
+  slotSub = onSnapshot(doc(db, "daySlots", selDate), snap => {
+    occupiedTimes = new Set(Object.keys(snap.exists() ? (snap.data().taken || {}) : {}));
     if (!submitting && selTime && occupiedTimes.has(selTime)) {
       selTime = null;
       toast("選択していた時刻が埋まりました");
@@ -413,21 +412,10 @@ async function submitOrder() {
   submitting = true;
   try {
     // ブロック済み番号チェック
-    const blocked = await getDocs(query(collection(db, "blockedPhones"), where("phone", "==", phone)));
-    if (!blocked.empty) {
+    const blockedSnap = await getDoc(doc(db, "blockedPhones", phone));
+    if (blockedSnap.exists()) {
       btn.disabled = false; btn.textContent = "この内容で注文を送信する";
       return err("この番号でのご注文はお受けできません。お電話でご注文ください（0276-70-2321）");
-    }
-    // 送信直前の重複チェック：同じ受け取り枠（1枠1注文）に別の注文が入っていないか再確認する
-    // 冷凍予約は枠を占有しないため、このチェックは焼きピザのみ
-    if (mode !== "frozen") {
-      const sameDay = await getDocs(query(collection(db, "takeoutOrders"), where("pickupDate", "==", selDate)));
-      occupiedTimes = occupiedSlots(sameDay.docs.map(d => d.data()), selDate);
-      if (occupiedTimes.has(selTime)) {
-        btn.disabled = false; btn.textContent = "この内容で注文を送信する";
-        selTime = null; renderSlots();
-        return err("申し訳ありません。その受け取り時刻は別のご注文が入りました。別の時刻をお選びください。");
-      }
     }
     const items = cart.map(c => {
       const it = anyById(c.itemId);
@@ -436,7 +424,7 @@ async function submitOrder() {
                cut: c.cut, pack: c.pack, choice: c.choice || null, toppings: c.toppings || [] };
     });
     const orderNo = makeOrderNo();
-    const ref = await addDoc(collection(db, "takeoutOrders"), {
+    const orderData = {
       orderNo, name, phone, note,
       kind: mode === "frozen" ? "frozen" : "takeout",
       seal: mode === "frozen" ? sealChoice : null,
@@ -444,7 +432,39 @@ async function submitOrder() {
       pickupDate: selDate, requestedDate: selDate, pickupTime: selTime, requestedPickup: selTime,
       confirmedPickup: null, confirmedDate: null, status: "pending",
       createdAt: serverTimestamp(),
-    });
+    };
+    let ref;
+    if (mode === "frozen") {
+      // 冷凍予約は枠を占有しない
+      ref = await addDoc(collection(db, "takeoutOrders"), orderData);
+    } else {
+      // 焼きピザは「1枠1注文」：枠の日次サマリ（daySlots）と注文を同じトランザクションで確定する
+      const orderRef = doc(collection(db, "takeoutOrders"));
+      const slotRef = doc(db, "daySlots", selDate);
+      try {
+        await runTransaction(db, async (tx) => {
+          const s = await tx.get(slotRef);
+          const taken = s.exists() ? (s.data().taken || {}) : {};
+          if (taken[selTime]) throw new Error("slot-taken");
+          tx.set(slotRef, { taken: { ...taken, [selTime]: orderNo } });
+          tx.set(orderRef, orderData);
+        });
+      } catch (e) {
+        if (e && e.message === "slot-taken") {
+          btn.disabled = false; btn.textContent = "この内容で注文を送信する";
+          selTime = null; renderSlots();
+          return err("申し訳ありません。その受け取り時刻は別のご注文が入りました。別の時刻をお選びください。");
+        }
+        throw e;
+      }
+      ref = orderRef;
+    }
+    // この端末の注文として記録（注文状況の確認はこの端末の記録から行う）
+    try {
+      const mine = JSON.parse(localStorage.getItem("ruberie_my_orders") || "[]");
+      mine.push({ id: ref.id, orderNo, pickupDate: selDate, requestedDate: selDate });
+      localStorage.setItem("ruberie_my_orders", JSON.stringify(mine.slice(-12)));
+    } catch (e) { /* 保存できなくても注文は完了させる */ }
     localStorage.setItem("ruberie_name", name);
     localStorage.setItem("ruberie_phone", phone);
     cart.length = 0; updateCartbar(false);
@@ -506,18 +526,28 @@ function showDone(docId, orderNo) {
 
 // ---------- 注文状況 ----------
 let statusDate = todayKey();
-let statusUnsub = null;
+let statusUnsubs = [];
+let statusData = {};
 function pickStatusDate(k) { statusDate = k; renderDateChips($("status-date-chips"), statusDate, pickStatusDate); searchStatus(); }
 function searchStatus() {
-  const phone = normalizePhone($("status-phone").value);
-  if (phone.length < 10) { $("status-results").innerHTML = `<div class="err">電話番号を入力してください。</div>`; return; }
-  localStorage.setItem("ruberie_phone", phone);
-  if (statusUnsub) statusUnsub();
-  const q = query(collection(db, "takeoutOrders"), where("phone", "==", phone));
-  statusUnsub = onSnapshot(q, snap => {
+  statusUnsubs.forEach(u => u()); statusUnsubs = []; statusData = {};
+  let mine = [];
+  try { mine = JSON.parse(localStorage.getItem("ruberie_my_orders") || "[]"); } catch (e) { mine = []; }
+  mine = mine.filter(m => m.pickupDate === statusDate || m.requestedDate === statusDate);
+  if (mine.length === 0) {
+    $("status-results").innerHTML = `<div class="card"><p class="note" style="margin:0;">${esc(formatDateJP(statusDate))}のご注文は見つかりませんでした。<br>この端末で注文した分だけが表示されます。別の端末で注文した場合は、お電話でお問い合わせください。</p></div>`;
+    return;
+  }
+  mine.forEach(m => {
+    statusUnsubs.push(onSnapshot(doc(db, "takeoutOrders", m.id), snap => {
+      if (snap.exists()) { statusData[m.id] = snap.data(); renderStatusResults(); }
+    }, e => console.error(e)));
+  });
+}
+function renderStatusResults() {
     // 厨房が受け取り日を変更した場合（冷凍予約）でも見つかるよう、
     // 確定日と希望日のどちらか一致で拾う
-    const orders = snap.docs.map(d => d.data())
+  const orders = Object.values(statusData)
       .filter(o => o.pickupDate === statusDate || o.requestedDate === statusDate)
       .sort((a, b) => (a.confirmedPickup || a.requestedPickup).localeCompare(b.confirmedPickup || b.requestedPickup));
     if (orders.length === 0) {
@@ -543,7 +573,6 @@ function searchStatus() {
         }).join("")}</div>
         <div style="text-align:right;font-weight:900;margin-top:6px;">合計 ${yen(o.total)}</div>
       </div>`).join("");
-  });
 }
 
 // ---------- 店内オーダー ----------
@@ -726,8 +755,7 @@ $("done-more").addEventListener("click", () => {
 $("go-status").addEventListener("click", () => {
   statusDate = todayKey();
   renderDateChips($("status-date-chips"), statusDate, pickStatusDate);
-  const savedPhone = localStorage.getItem("ruberie_phone") || "";
-  if (savedPhone) { $("status-phone").value = savedPhone; searchStatus(); }
+  searchStatus();
   show("scr-status");
 });
 $("detail-back").addEventListener("click", () => show("scr-order"));
@@ -745,7 +773,6 @@ $("cartbar-btn").addEventListener("click", () => {
   if (mode === "dinein") openDineinCheckout(); else openCheckout();
 });
 $("submit-order").addEventListener("click", submitOrder);
-$("status-search").addEventListener("click", searchStatus);
 updateCartbar(false);
 // 席別QR（?seat=）で開かれた場合は、その席で店内オーダーを直接開始する
 if (seatFixed) enterDinein();
