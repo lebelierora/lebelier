@@ -254,7 +254,8 @@ function renderDetail() {
   if (choiceVisible) {
     if (detail.choice && !visibleOptions.some(o => o.label === detail.choice)) detail.choice = null;
     if (!detail.choice && visibleOptions.length === 1) detail.choice = visibleOptions[0].label; // 残り1つなら自動選択
-    html += `<div class="opt-group"><div class="label">${esc(it.choice.label)}</div><div class="opt-row">` +
+    const choiceLabel = mode === "takeout" && it.choice.labelTakeout ? it.choice.labelTakeout : it.choice.label;
+    html += `<div class="opt-group"><div class="label">${esc(choiceLabel)}</div><div class="opt-row">` +
       visibleOptions.map(o => `
         <button data-choice="${esc(o.label)}" class="${detail.choice === o.label ? "active" : ""}">${esc(o.label)}${o.delta ? ` <span style="color:var(--red-dark);">${o.delta > 0 ? "+" : "−"}${yen(Math.abs(o.delta))}</span>` : ""}</button>`).join("") +
       `</div>${detail.choice ? "" : `<div class="opt-note">お選びください（必須）</div>`}</div>`;
@@ -279,7 +280,7 @@ function renderDetail() {
         <button id="qty-minus">−</button><div class="qty">${detail.qty}</div><button id="qty-plus">＋</button>
       </div>
     </div>
-    <button class="btn" id="add-cart" ${choiceVisible && !detail.choice ? "disabled" : ""}>${choiceVisible && !detail.choice ? esc(it.choice.label) : `カートに入れる　${yen(detailUnit() * detail.qty)}`}</button>`;
+    <button class="btn" id="add-cart" ${choiceVisible && !detail.choice ? "disabled" : ""}>${choiceVisible && !detail.choice ? esc(mode === "takeout" && it.choice.labelTakeout ? it.choice.labelTakeout : it.choice.label) : `カートに入れる　${yen(detailUnit() * detail.qty)}`}</button>`;
   $("detail-body").innerHTML = html;
 
   if (hasCutPack(it) && $("cut-nocut")) {
