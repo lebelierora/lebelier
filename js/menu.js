@@ -227,8 +227,9 @@ export function weekdayOf(key) {
 
 export function isThursday(key) { return weekdayOf(key) === 4; }
 
-// その日の最終枠 "HH:MM"（日曜17:30 / それ以外19:30）
-export function lastSlot(key) { return weekdayOf(key) === 0 ? "17:30" : "19:30"; }
+// その日の最終枠 "HH:MM"（日曜17:30 / それ以外19:30）。日付例外（短縮営業等）は営業カレンダーに合わせてここへ追加する
+export const LAST_SLOT_EXCEPTIONS = { "2026-11-28": "17:30" }; // 2026-11-28(土) 恵比寿講で短縮営業（LO17:30）
+export function lastSlot(key) { return LAST_SLOT_EXCEPTIONS[key] || (weekdayOf(key) === 0 ? "17:30" : "19:30"); }
 
 export function toMin(hhmm) { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; }
 export function toHHMM(min) { return `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`; }
