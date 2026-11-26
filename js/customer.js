@@ -1,5 +1,5 @@
 // お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
-import { db } from "./firebase-config.js?v=20251125-75";
+import { db } from "./firebase-config.js?v=20251125-76";
 import {
   collection, addDoc, getDocs, query, where, doc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -7,10 +7,10 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes, occupiedSlots,
   normalizePhone, esc, yen, SEATS, seatLabel,
-} from "./menu.js?v=20251125-75";
+} from "./menu.js?v=20251125-76";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
-} from "./frozen-menu.js?v=20251125-75";
+} from "./frozen-menu.js?v=20251125-76";
 
 // 焼きピザ・冷凍ピザ両方のメニューから商品を引く
 const anyById = id => menuById(id) || frozenById(id);
@@ -177,6 +177,14 @@ function renderDetail() {
   if (hasCutPack(it)) {
     const boxDisabledByCut = detail.cut === "cut4";
     const boxDisabled = it.noBox || boxDisabledByCut;
+    if (mode === "dinein" && it.noCutDineIn) {
+      detail.cut = "nocut";
+      html += `
+    <div class="opt-group">
+      <div class="label">カット</div>
+      <div class="opt-note">この商品は店内ではカットせずにご提供いたします。お客様ご自身でカットしてお召し上がりください。</div>
+    </div>`;
+    } else {
     html += `
     <div class="opt-group">
       <div class="label">カット</div>
@@ -186,6 +194,7 @@ function renderDetail() {
       </div>
       ${detail.pack === "box" ? `<div class="opt-note">箱はカットなしのお渡しです</div>` : ""}
     </div>`;
+    }
     // 包装（箱）はテイクアウトのみ。店内では出さない
     if (mode === "takeout") {
       html += `
@@ -230,7 +239,7 @@ function renderDetail() {
     <button class="btn" id="add-cart" ${choiceVisible && !detail.choice ? "disabled" : ""}>${choiceVisible && !detail.choice ? esc(it.choice.label) : `カートに入れる　${yen(detailUnit() * detail.qty)}`}</button>`;
   $("detail-body").innerHTML = html;
 
-  if (hasCutPack(it)) {
+  if (hasCutPack(it) && $("cut-nocut")) {
     $("cut-nocut").addEventListener("click", () => { detail.cut = "nocut"; renderDetail(); });
     $("cut-cut4").addEventListener("click", () => { detail.cut = "cut4"; if (detail.pack === "box") detail.pack = "paper"; renderDetail(); });
     const paperBtn = $("pack-paper");
