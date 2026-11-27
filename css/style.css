@@ -207,8 +207,8 @@ body.frozen .item .noimg{aspect-ratio:4/3;}
 #scr-home .btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(59,42,30,.25);}
 #scr-home h2{display:inline-block;padding:0 8px;background:linear-gradient(transparent 62%,#ffe08a 62%);}
 .card,.item{box-shadow:0 2px 6px rgba(59,42,30,.07);}
-.logo-banner{text-align:center;margin:2px 0 14px;}
-.logo-banner img{width:min(280px,78%);height:auto;border-radius:16px;box-shadow:0 2px 8px rgba(59,42,30,.12);}
+.logo-banner{margin:2px 0 14px;}
+.logo-banner img{width:100%;height:auto;display:block;border-radius:16px;box-shadow:0 2px 8px rgba(59,42,30,.12);}
 
 /* 平日セットの案内（お客様側） */
 .set-note { background:#eafaf1; border:2px solid #27ae60; color:#1e8449; border-radius:12px; padding:10px 14px; font-weight:800; font-size:16px; margin-top:10px; }
