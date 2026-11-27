@@ -264,6 +264,15 @@ export function closedReason(key) {
   return null;
 }
 
+// 予約を受け付ける最終日。通常は「今日から7日先（+7）」までだが、年末年始は一時的に
+// 2027-01-03 まで延長する（2026-11-27 本人指示）。today+7 が EXTEND_UNTIL を過ぎたら
+// 通常の7日ルールに戻るため、この延長は自動で失効する（後日の手直しは不要）。
+export const EXTEND_UNTIL = "2027-01-03";
+export function bookingEndKey() {
+  const rolling = addDays(todayKey(), 7).key;
+  return rolling > EXTEND_UNTIL ? rolling : EXTEND_UNTIL;
+}
+
 // その日の最終枠 "HH:MM"（日曜17:30 / それ以外19:30、例外があればそちら優先）
 export function lastSlot(key) {
   const ov = dateOverride(key);

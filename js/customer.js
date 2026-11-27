@@ -6,8 +6,8 @@ import {
 import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isClosedDay, closedReason, timeSlots, leadMinutes,
-  normalizePhone, esc, yen, SEATS, seatLabel, toMin,
-} from "./menu.js?v=20251127-109";
+  normalizePhone, esc, yen, SEATS, seatLabel, toMin, bookingEndKey,
+} from "./menu.js?v=20251127-110";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
 } from "./frozen-menu.js?v=20251126-84";
@@ -93,7 +93,7 @@ function updateHeader() {
     $("page-sub").textContent = "創作ピザとスイーツのお店 るべりえ（群馬県邑楽町）／お席からご注文いただけます。お会計はお帰りの際にレジでお願いします";
   } else if (mode === "frozen") {
     $("page-title").textContent = "るべりえ 冷凍ピザ店頭予約";
-    $("page-sub").textContent = "冷凍ピザの店頭受け取り予約です。受け取りは翌々日から1週間先まで／お支払いは受け取り時にレジでお願いします（現金・PayPay・コハクペイ等）";
+    $("page-sub").textContent = `冷凍ピザの店頭受け取り予約です。受け取りは翌々日から${formatDateJP(bookingEndKey())}まで／お支払いは受け取り時にレジでお願いします（現金・PayPay・コハクペイ等）`;
   } else {
     $("page-title").textContent = "るべりえ テイクアウト注文";
     $("page-sub").textContent = "創作ピザとスイーツのお店 るべりえ（群馬県邑楽町）／お支払いは受け取り時にレジでお願いします（現金・PayPay・コハクペイ等）";
@@ -581,9 +581,15 @@ function watchSlots() {
 function unwatchSlots() { if (slotSub) { slotSub(); slotSub = null; } slotDocStopped = false; }
 function dateChipList() {
   const list = [];
-  // 冷凍予約は翌々日（+2）から、焼きピザは今日から。どちらも1週間先（+7）まで
+  // 冷凍予約は翌々日（+2）から、焼きピザは今日から。最終日は bookingEndKey()
+  // （通常は1週間先（+7）まで、年末年始は一時的に 2027-01-03 まで延長）
   const from = mode === "frozen" ? 2 : 0;
-  for (let i = from; i <= 7; i++) list.push(addDays(todayKey(), i).key);
+  const end = bookingEndKey();
+  for (let i = from; ; i++) {
+    const k = addDays(todayKey(), i).key;
+    if (k > end) break;
+    list.push(k);
+  }
   return list;
 }
 function renderDateChips(el, selected, onPick) {
@@ -641,7 +647,7 @@ function renderSlots() {
   if (selTime && (!slots.includes(selTime) || occupiedTimes.has(selTime))) selTime = null;
   const lead = leadMinutes(cartQty());
   $("lead-note").textContent = mode === "frozen"
-    ? "冷凍ピザはご用意に時間がかかるため、受け取りは翌々日から1週間先までです。日時はご希望として受け付け、お店が確認して確定します。当日・翌日にお急ぎの場合はお電話ください（0276-70-2321）。"
+    ? `冷凍ピザはご用意に時間がかかるため、受け取りは翌々日から${formatDateJP(bookingEndKey())}までです。日時はご希望として受け付け、お店が確認して確定します。当日・翌日にお急ぎの場合はお電話ください（0276-70-2321）。`
     : selDate === todayKey()
     ? (cartQty() >= 5 ? `ご注文点数が多いため、最短で${lead}分後からの受け取りになります。` : `最短で${lead}分後からの受け取りになります。`)
     : "営業時間内（11:00〜最終受け取り 月〜土19:30／日曜17:30）でお選びください。";
