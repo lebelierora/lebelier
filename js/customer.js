@@ -70,7 +70,8 @@ function orderCodeFromId(id) {
 const screens = ["scr-home", "scr-seat", "scr-order", "scr-detail", "scr-checkout", "scr-dinein", "scr-done", "scr-status"];
 function show(id) {
   screens.forEach(s => $(s).classList.toggle("hidden", s !== id));
-  $("cartbar").classList.toggle("hidden", !(id === "scr-order" || id === "scr-detail"));
+  $("cartbar").classList.toggle("hidden", id !== "scr-order");
+  $("detailbar").classList.toggle("hidden", id !== "scr-detail");
   $("dinein-bar").classList.toggle("hidden", !(id === "scr-order" && mode === "dinein"));
   window.scrollTo(0, 0);
 }
@@ -228,13 +229,66 @@ function descHtml(it) {
 
 function hasCutPack(item) { return CUT_PACK_CATS.includes(item.cat); }
 function detailUnit() { return unitPrice(detail.item, [...detail.toppings], detail.pack, detail.choice); }
+function detailChoiceMissing() {
+  if (!detail || !detail.item.choice) return false;
+  const choiceVisible = mode === "dinein" || !detail.item.choice.dineInOnly;
+  return choiceVisible && !detail.choice;
+}
+function updateDetailbar() {
+  if (!detail) return;
+  const price = $("detailbar-price");
+  if (!price) return;
+  const unit = detailUnit();
+  price.textContent = yen(unit * detail.qty);
+  $("detailbar-sub").textContent = detail.qty > 1 ? `${yen(unit)} × ${detail.qty}点` : `数量 ${detail.qty}`;
+}
+let choiceGuideTimer = null;
+function guideToRequiredChoice() {
+  const group = $("choice-group");
+  if (!group) return;
+  group.scrollIntoView({ behavior: "smooth", block: "center" });
+  group.classList.add("attention");
+  const alert = $("choice-alert");
+  if (alert) alert.classList.remove("hidden");
+  toast("まずこちらをお選びください", 1800);
+  clearTimeout(choiceGuideTimer);
+  choiceGuideTimer = setTimeout(() => {
+    group.classList.remove("attention");
+    if (alert) alert.classList.add("hidden");
+  }, 2400);
+}
+function tryAddDetailToCart() {
+  if (!detail) return;
+  if (detailChoiceMissing()) { guideToRequiredChoice(); return; }
+  const it = detail.item;
+  cart.push({ itemId: it.id, qty: detail.qty, cut: hasCutPack(it) ? detail.cut : null,
+              pack: hasCutPack(it) && mode === "takeout" ? detail.pack : null,
+              choice: detail.choice, toppings: [...detail.toppings], timing: detail.timing || null });
+  updateCartbar(true);
+  toast(`${it.name}をカートに入れました`);
+  show("scr-order");
+}
+let detailHintObserver = null;
+function setupDetailScrollHint() {
+  const hint = $("detail-scroll-hint");
+  if (!hint) return;
+  const target = $("detail-body").querySelector(".opt-group");
+  if (detailHintObserver) detailHintObserver.disconnect();
+  if (!target || !("IntersectionObserver" in window)) { hint.classList.add("hidden"); return; }
+  hint.classList.remove("hidden");
+  detailHintObserver = new IntersectionObserver(entries => {
+    hint.classList.toggle("hidden", entries[0].isIntersecting);
+  }, { threshold: 0.12 });
+  detailHintObserver.observe(target);
+}
 function renderDetail() {
   const it = detail.item;
   // onlyChoice 付きトッピングは、その選択肢を選んだときだけ有効（例：ラテのアイストッピングはアイスのみ）。選択が合わなければ自動で外す
   (it.toppings || []).forEach(t => { if (t.onlyChoice && detail.choice !== t.onlyChoice) detail.toppings.delete(t.label); });
   let html = `
     <div class="card" style="padding:0;overflow:hidden;">
-      ${effImg(it) ? `<img src="${esc(effImg(it))}" alt="${esc(it.name)}" style="${it.poster ? "width:100%;aspect-ratio:3/4;object-fit:contain;background:#f6efe3;display:block;" : mode === "frozen" ? "width:100%;aspect-ratio:4/3;object-fit:contain;background:#f6efe3;display:block;" : "width:100%;aspect-ratio:1/1;object-fit:cover;display:block;"}">` : ""}
+      ${effImg(it) ? `<img class="detail-photo ${it.poster || mode === "frozen" ? "contain" : ""}" src="${esc(effImg(it))}" alt="${esc(it.name)}">
+      <div class="scroll-hint" id="detail-scroll-hint">↓ 下で味や大きさなどを選べます</div>` : ""}
       <div style="padding:14px;">
         <div style="font-size:20px;font-weight:900;">${esc(it.name)}${it.seasonal ? ` <span class="season-badge">季節メニュー</span>` : ""}${it.eatInBadge ? ` <span class="eatin-badge">イートイン限定</span>` : ""}</div>
         ${descHtml(it)}
@@ -283,10 +337,10 @@ function renderDetail() {
     if (detail.choice && !visibleOptions.some(o => o.label === detail.choice)) detail.choice = null;
     if (!detail.choice && visibleOptions.length === 1) detail.choice = visibleOptions[0].label; // 残り1つなら自動選択
     const choiceLabel = mode === "takeout" && it.choice.labelTakeout ? it.choice.labelTakeout : it.choice.label;
-    html += `<div class="opt-group"><div class="label">${esc(choiceLabel)}</div><div class="opt-row">` +
+    html += `<div class="opt-group" id="choice-group"><div class="label">${esc(choiceLabel)}</div><div class="opt-row">` +
       visibleOptions.map(o => `
         <button data-choice="${esc(o.label)}" class="${detail.choice === o.label ? "active" : ""}">${esc(o.label)}${o.delta ? ` <span style="color:var(--red-dark);">${o.delta > 0 ? "+" : "−"}${yen(Math.abs(o.delta))}</span>` : ""}</button>`).join("") +
-      `</div>${detail.choice ? "" : `<div class="opt-note">お選びください（必須）</div>`}</div>`;
+      `</div>${detail.choice ? "" : `<div class="opt-note">お選びください（必須）</div><div class="choice-alert hidden" id="choice-alert">まずこちらをお選びください</div>`}</div>`;
   }
   // dineInOnly のトッピングは店内モードでのみ表示する（テイクアウトでは出さない）
   const visibleToppings = (it.toppings || []).filter(t => (mode === "dinein" || !t.dineInOnly) && (!t.onlyChoice || detail.choice === t.onlyChoice));
@@ -314,7 +368,7 @@ function renderDetail() {
         <button id="qty-minus">−</button><div class="qty">${detail.qty}</div><button id="qty-plus">＋</button>
       </div>
     </div>
-    <button class="btn" id="add-cart" ${choiceVisible && !detail.choice ? "disabled" : ""}>${choiceVisible && !detail.choice ? esc(mode === "takeout" && it.choice.labelTakeout ? it.choice.labelTakeout : it.choice.label) : `カートに入れる　${yen(detailUnit() * detail.qty)}`}</button>`;
+    <button class="btn" id="add-cart">カートに入れる　${yen(detailUnit() * detail.qty)}</button>`;
   $("detail-body").innerHTML = html;
 
   if (hasCutPack(it) && $("cut-nocut")) {
@@ -337,15 +391,9 @@ function renderDetail() {
     b.addEventListener("click", () => { detail.timing = b.dataset.timing; renderDetail(); }));
   $("qty-minus").addEventListener("click", () => { if (detail.qty > 1) detail.qty--; renderDetail(); });
   $("qty-plus").addEventListener("click", () => { if (detail.qty < MAX_QTY) detail.qty++; renderDetail(); });
-  $("add-cart").addEventListener("click", () => {
-    if (it.choice && (mode === "dinein" || !it.choice.dineInOnly) && !detail.choice) return; // 念のため：未選択では追加しない
-    cart.push({ itemId: it.id, qty: detail.qty, cut: hasCutPack(it) ? detail.cut : null,
-                pack: hasCutPack(it) && mode === "takeout" ? detail.pack : null,
-                choice: detail.choice, toppings: [...detail.toppings], timing: detail.timing || null });
-    updateCartbar(true);
-    toast(`${it.name}をカートに入れました`);
-    show("scr-order");
-  });
+  $("add-cart").addEventListener("click", tryAddDetailToCart);
+  updateDetailbar();
+  setupDetailScrollHint();
 }
 
 // ---------- チェックアウト ----------
@@ -973,6 +1021,7 @@ $("done-home").addEventListener("click", () => {
   setMode("takeout");
   show("scr-home");
 });
+$("detailbar-add").addEventListener("click", tryAddDetailToCart);
 $("cartbar-btn").addEventListener("click", () => {
   if (cartQty() === 0) return;
   if (mode === "dinein") openDineinCheckout(); else openCheckout();

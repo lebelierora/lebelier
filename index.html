@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>るべりえ 注文サイト</title>
-<link rel="stylesheet" href="css/style.css?v=20251127-94">
+<link rel="stylesheet" href="css/style.css?v=20251127-95">
 </head>
 <body>
 <div class="tricolor"></div>
@@ -232,6 +232,15 @@
   <button id="cartbar-btn">カートを見る<span class="cart-badge hidden" id="cart-badge">0</span></button>
 </div>
 
+<!-- 商品詳細専用の下部バー（詳細表示中はカートバーの代わりに表示） -->
+<div class="detailbar hidden" id="detailbar">
+  <div class="detailbar-info">
+    <span class="detailbar-price" id="detailbar-price">¥0</span>
+    <span class="detailbar-sub" id="detailbar-sub">数量 1</span>
+  </div>
+  <button id="detailbar-add" type="button">カートに入れる</button>
+</div>
+
 <!-- 呼び出しの用件えらび -->
 <div class="modal hidden" id="call-modal">
   <div class="modal-card">
@@ -252,6 +261,6 @@
 <div class="toast" id="toast"></div>
 
 <script src="js/qrcode.js"></script>
-<script type="module" src="js/customer.js?v=20251127-100"></script>
+<script type="module" src="js/customer.js?v=20251127-101"></script>
 </body>
 </html>
