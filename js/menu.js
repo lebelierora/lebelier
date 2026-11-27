@@ -29,6 +29,10 @@ export const CATEGORIES = [
 // choice: {label, options:[{label, delta}]} 単一選択（必須・未選択スタート）。
 //   詳細画面で選ぶまで「カートに入れる」は押せない。
 //   選択した choice のラベルは注文データに保存され、厨房・お客側の両方に表示される。
+// advanceOnly: true の商品は早割の事前予約専用（2026-11-27 本人決定）。fromDate（受付開始日）
+//   より前は一覧に出さず、受け取り日が当日の間は「前日までのご予約専用です」と表示して
+//   注文できないようにする。判定は advanceGate()、表示・制御は customer.js 側。
+//   テイクアウト専用にするため takeoutOnly: true と併用する。
 export const MENU = [
   // ---- ホールピザ ----
   { id: "bolognese", cat: "hall", name: "るべりえボロネーゼ", img: "images/bolognese.jpg", price: 850, desc: "自家製ミートソースとマスカルポーネのピザ。ペコリーノチーズ・ドライバジル・魚醤がアクセントになっています。寒い時期限定なのでお試しください。・特定原材料 (一部に小麦・乳成分・牛肉・豚肉・大豆・鶏肉を含む) ※厨房では卵・えび・かにを含む製品を製造しています。", seasonal: true, toppings: [{ label: "ハラペーニョ", delta: 80 }] },
@@ -90,6 +94,8 @@ export const MENU = [
   { id: "age-moriawase", cat: "side", name: "揚げ物盛り合わせ", img: "images/age-moriawase.jpg", imgDineIn: "images/age-moriawase-dinein.jpg", price: 700, desc: "ゼッポレ9粒・皮付きじゃがいもの素揚げ６本クリスピーチキン3個入ってます。・特定原材料 (一部に豚肉・小麦・乳成分・卵・牛肉・大豆・鶏肉を含む) ※厨房ではえび・かにを含む製品を製造しています。", toppings: [] },
   { id: "ham-moriawase", cat: "side", name: "ハム盛り合わせ", img: "images/ham-moriawase.jpg", imgDineIn: "images/ham-moriawase-dinein.jpg", price: 1600, desc: "プロシュート・コッパ・スペック・ミラノサラミ・スモークチキンの盛り合わせです。・特定原材料 (一部に豚肉・鶏肉を含む) ※厨房ではえび・かにを含む製品を製造しています。", toppings: [] },
   { id: "party-set", cat: "side", name: "パーティーセット", img: "images/party-set.jpg", price: 2900, desc: "ハム盛り合わせ・パーティーるべりえチキン・ゼッポレ・じゃがいもの素揚げ粉チーズのセットです。・特定原材料 (一部に豚肉・小麦・乳成分・卵・豚肉・牛肉・大豆・鶏肉を含む) ※厨房ではえび・かにを含む製品を製造しています。", toppings: [{ label: "パーティーるべりえチキンピリ辛に変更", delta: 50 }] },
+  { id: "party-set-early", cat: "side", name: "パーティーセット（早割）", img: "images/party-set.jpg", price: 2750, takeoutOnly: true, advanceOnly: true, fromDate: "2026-11-30", desc: "【早割・前日までのご予約専用】ハム盛り合わせ・パーティーるべりえチキン・ゼッポレ・じゃがいもの素揚げ粉チーズのセットです。前日までにご予約いただくと、通常価格よりお得な早割価格でご用意します。当日の受け取りではご注文いただけません。・特定原材料 (一部に豚肉・小麦・乳成分・卵・豚肉・牛肉・大豆・鶏肉を含む) ※厨房ではえび・かにを含む製品を製造しています。", toppings: [{ label: "パーティーるべりえチキン用ピリ辛パウダー別添", delta: 50 }] },
+  { id: "party-chicken-early", cat: "side", name: "パーティーるべりえチキン（早割）", img: "images/crispy-chicken.jpg", price: 850, takeoutOnly: true, advanceOnly: true, fromDate: "2026-11-30", desc: "【早割・前日までのご予約専用】国産鶏胸肉を使用した自家製クリスピーチキンのパーティーサイズ（10〜12個）です。サクサク食感がたまらないビールのお供にもオススメです。前日までにご予約いただくと、通常のパーティーサイズよりお得な早割価格でご用意します。当日の受け取りではご注文いただけません。・特定原材料 (一部に豚肉・小麦・乳成分・卵・牛肉・大豆・鶏肉を含む) ※厨房ではえび・かにを含む製品を製造しています。", toppings: [{ label: "ピリ辛パウダー別添", delta: 50 }] },
   { id: "takunomi-set", cat: "side", name: "宅飲み！！るべりえセット", img: "images/takunomi-set.jpg", price: 1300, takeoutOnly: true, desc: "ハートランド生ビール・ゼッポレ・もつトマト煮込みのセットです。※生ビールは御来店頂いてからご用意はじめます。もつトマト煮込みはテイクアウトはコーヒーカップに入れて提供致します。・特定原材料 (一部に豚肉・小麦・乳成分・牛肉・大豆・鶏肉を含む) ※厨房では卵・えび・かにを含む製品を製造しています。", descDineIn: "ハートランド生ビール・ゼッポレ・もつトマト煮込みのセットです。※生ビールは御来店頂いてからご用意はじめます。・特定原材料 (一部に豚肉・小麦・乳成分・牛肉・大豆・鶏肉を含む) ※厨房では卵・えび・かにを含む製品を製造しています。", toppings: [] },
   { id: "green-olive", cat: "side", name: "グリーンオリーブ種あり", img: "images/green-olive.jpg", price: 330, desc: "グリーンオリーブ種ありです。", toppings: [] },
   { id: "pickles", cat: "side", name: "ピクルス", img: "images/pickles.jpg", price: 330, desc: "群馬県産きゅうりのピクルスです。", toppings: [] },
@@ -271,6 +277,18 @@ export const EXTEND_UNTIL = "2027-01-03";
 export function bookingEndKey() {
   const rolling = addDays(todayKey(), 7).key;
   return rolling > EXTEND_UNTIL ? rolling : EXTEND_UNTIL;
+}
+
+// 早割（advanceOnly）商品の注文可否を返す。
+//   "hidden": 受付開始日（fromDate）より前なので一覧に出さない
+//   "blocked": 受け取り日が当日（または未選択）なので「前日までのご予約専用」で注文不可
+//   "ok": 注文できる（advanceOnly でない商品も常に "ok"）
+// today / pickupDate はどちらも "YYYY-MM-DD"（文字列比較で前後が一致する形式）。
+export function advanceGate(item, today, pickupDate) {
+  if (!item || !item.advanceOnly) return "ok";
+  if (item.fromDate && today < item.fromDate) return "hidden";
+  if (!pickupDate || pickupDate <= today) return "blocked";
+  return "ok";
 }
 
 // その日の最終枠 "HH:MM"（日曜17:30 / それ以外19:30、例外があればそちら優先）

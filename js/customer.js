@@ -6,8 +6,8 @@ import {
 import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isClosedDay, closedReason, timeSlots, leadMinutes,
-  normalizePhone, esc, yen, SEATS, seatLabel, toMin, bookingEndKey,
-} from "./menu.js?v=20251127-110";
+  normalizePhone, esc, yen, SEATS, seatLabel, toMin, bookingEndKey, advanceGate,
+} from "./menu.js?v=20251127-111";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
 } from "./frozen-menu.js?v=20251126-84";
@@ -150,9 +150,21 @@ function renderTabs() {
   $("cat-tabs").querySelectorAll("button").forEach(b =>
     b.addEventListener("click", () => { currentCat = b.dataset.cat; renderTabs(); renderGrid(); }));
 }
+// ---------- 早割（事前予約専用）商品のゲート ----------
+// advanceOnly 商品は、受付開始日（fromDate）より前は一覧に出さない。受け取り日が当日の間は
+// 「前日までのご予約専用です」と表示して注文できないようにする（存在を知ってもらい、
+// 次回は前日までに予約してもらうため。当日でも通常版は注文できる）。
+function advancePickupDate() {
+  const p = pickupSel[mode];
+  return p ? p.date : null;
+}
+function advanceStateOf(it) { return advanceGate(it, todayKey(), advancePickupDate()); }
+function advanceBlocked(it) { return advanceStateOf(it) === "blocked"; }
+
 function renderGrid() {
   const items = (mode === "frozen" ? frozenItemsForCategory(currentCat) : itemsForCategory(currentCat))
-    .filter(m => !m.hidden && (mode === "dinein" || !m.dineInOnly) && (mode === "takeout" || !m.takeoutOnly)); // dineInOnly は店内のみ／takeoutOnly はテイクアウトのみ／hidden は常に出さない
+    .filter(m => !m.hidden && (mode === "dinein" || !m.dineInOnly) && (mode === "takeout" || !m.takeoutOnly)) // dineInOnly は店内のみ／takeoutOnly はテイクアウトのみ／hidden は常に出さない
+    .filter(m => advanceStateOf(m) !== "hidden"); // 早割商品は受付開始日より前は出さない
   $("item-grid").innerHTML = items.map(m => `
     <button class="item" data-id="${m.id}">
       ${effImg(m) ? `<img src="${esc(effImg(m))}" alt="${esc(m.name)}" loading="lazy"${m.poster ? ` style="object-fit:contain;background:#f6efe3;"` : ""}>` : (m.img ? "" : `<div class="noimg">写真なし</div>`)}
@@ -160,6 +172,7 @@ function renderGrid() {
         <div class="name">${esc(m.name)}${m.seasonal ? ` <span class="season-badge">季節</span>` : ""}${m.eatInBadge ? ` <span class="eatin-badge">イートイン限定</span>` : ""}</div>
         <!-- 一覧では説明文を表示しない（本人指示 2026-11-25：見づらいため。説明は詳細画面のみ） -->
         <div class="price">${yen(m.price)}${m.choice && m.choice.options.some(o => o.delta > 0) ? "〜" : ""}</div>
+        ${advanceBlocked(m) ? `<div class="advance-note">前日までのご予約専用です</div>` : ""}
       </div>
     </button>`).join("");
   $("item-grid").querySelectorAll(".item").forEach(b =>
@@ -331,8 +344,20 @@ function guideToRequiredTiming() {
     if (alert) alert.classList.add("hidden");
   }, 2400);
 }
+let advanceGuideTimer = null;
+function guideToAdvance() {
+  const group = $("advance-group");
+  if (group) {
+    group.scrollIntoView({ behavior: "smooth", block: "center" });
+    group.classList.add("attention");
+    clearTimeout(advanceGuideTimer);
+    advanceGuideTimer = setTimeout(() => group.classList.remove("attention"), 2400);
+  }
+  toast("早割商品は前日までのご予約専用です", 2200);
+}
 function tryAddDetailToCart() {
   if (!detail) return;
+  if (advanceBlocked(detail.item)) { guideToAdvance(); return; }
   if (detailCutMissing()) { guideToRequiredCut(); return; }
   if (detailPackMissing()) { guideToRequiredPack(); return; }
   if (detailChoiceMissing()) { guideToRequiredChoice(); return; }
@@ -373,6 +398,13 @@ function renderDetail() {
         <div style="font-weight:900;font-size:19px;margin-top:8px;">${yen(it.price)}</div>
       </div>
     </div>`;
+  if (advanceBlocked(it)) {
+    html += `
+    <div class="opt-group" id="advance-group">
+      <div class="choice-alert">この商品は早割のため、前日までのご予約専用です</div>
+      <div class="opt-note">本日の受け取りではご注文いただけません。受け取り日時を明日以降に変更するとご注文いただけます（通常価格の商品は当日でもご注文いただけます）。</div>
+    </div>`;
+  }
   if (hasCutPack(it)) {
     const boxDisabledByCut = detail.cut === "cut4" || detail.cut === "cut6";
     const boxDisabled = it.noBox || boxDisabledByCut;
@@ -506,6 +538,11 @@ function pickupProblemSync() {
   if (mode === "dinein") return null;
   const p = pickupSel[mode];
   if (!p || !p.date || !p.time) return { type: "unset", message: "受け取り日時が選ばれていません。日時をお選びください。" };
+  // 早割商品がカートにあるのに受け取り日が当日になっている場合は注文できない
+  // （早割を入れた後に、日時だけ当日へ変更されたケースをここで止める）
+  if (p.date <= todayKey() && cart.some(c => { const it = anyById(c.itemId); return it && it.advanceOnly; })) {
+    return { type: "advance", message: "早割商品は当日の受け取りでは注文できません。日時を明日以降に変更するか、早割商品をカートから外してください。" };
+  }
   if (mode === "takeout" && p.date === todayKey() && !timeSlots(p.date, cartQty()).includes(p.time)) {
     const lead = leadMinutes(cartQty());
     return { type: "lead", message: cartQty() >= 5
@@ -693,13 +730,13 @@ function refreshCheckoutPickupWarn() {
   if (mode === "dinein" || currentScreen !== "scr-checkout") return;
   const prob = pickupProblemSync();
   if (prob) { setPickupWarn(prob.type, prob.message); return; }
-  if (pickupWarnKind === "lead" || pickupWarnKind === "unset") setPickupWarn(null, "");
+  if (pickupWarnKind === "lead" || pickupWarnKind === "unset" || pickupWarnKind === "advance") setPickupWarn(null, "");
 }
 // 会計画面に入った時点の日時チェック（受付停止・枠の埋まりは daySlots を読んで確認する）
 async function validatePickupAtCheckout() {
   const prob = pickupProblemSync();
   if (prob) { setPickupWarn(prob.type, prob.message); return; }
-  if (pickupWarnKind === "lead" || pickupWarnKind === "unset") setPickupWarn(null, "");
+  if (pickupWarnKind === "lead" || pickupWarnKind === "unset" || pickupWarnKind === "advance") setPickupWarn(null, "");
   if (mode !== "takeout") return;
   try {
     const snap = await getDoc(doc(db, "daySlots", selDate));
