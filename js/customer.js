@@ -1,4 +1,4 @@
-// お客さん側ロジック：メニュー表示 → カスタマイズ → カート → 日時選択 → 送信 → ライブ状況
+// お客さん側ロジック：日時選択 → メニュー表示 → カスタマイズ → カート → 送信 → ライブ状況
 import { db } from "./firebase-config.js?v=20251126-84";
 import {
   collection, addDoc, doc, getDoc, onSnapshot, runTransaction, serverTimestamp,
@@ -67,8 +67,10 @@ function orderCodeFromId(id) {
   return letter + digits;
 }
 
-const screens = ["scr-home", "scr-seat", "scr-order", "scr-detail", "scr-checkout", "scr-dinein", "scr-done", "scr-status"];
+const screens = ["scr-home", "scr-seat", "scr-order", "scr-pickup", "scr-detail", "scr-checkout", "scr-dinein", "scr-done", "scr-status"];
+let currentScreen = "scr-home";
 function show(id) {
+  currentScreen = id;
   screens.forEach(s => $(s).classList.toggle("hidden", s !== id));
   $("cartbar").classList.toggle("hidden", id !== "scr-order");
   $("detailbar").classList.toggle("hidden", id !== "scr-detail");
@@ -104,6 +106,7 @@ function setMode(m) {
   document.body.classList.toggle("frozen", m === "frozen");
   $("frozen-banner").classList.toggle("hidden", m !== "frozen");
   $("frozen-banner2").classList.toggle("hidden", m !== "frozen");
+  $("frozen-banner0").classList.toggle("hidden", m !== "frozen");
   // 店内はお席カード内に同趣旨の案内があるため、一覧上の案内はテイクアウト／冷凍だけに出す
   $("order-guide").classList.toggle("hidden", m === "dinein");
   $("order-guide").textContent = m === "frozen"
@@ -111,6 +114,7 @@ function setMode(m) {
     : "ご注文は下のメニューから商品をお選びください";
   updateHeader();
   updateCartbar(false);
+  updatePickupBar();
 }
 function cartQty() { return cart.reduce((a, c) => a + c.qty, 0); }
 function cartTotal() {
@@ -337,6 +341,7 @@ function tryAddDetailToCart() {
   updateCartbar(true);
   toast(`${it.name}をカートに入れました`);
   show("scr-order");
+  checkLeadCrossing();
 }
 let detailHintObserver = null;
 function setupDetailScrollHint() {
@@ -477,6 +482,81 @@ let slotDocStopped = false;    // 選択中の日の daySlots に takeoutStopped
 let slotSub = null;            // 枠の埋まり状況の購読解除関数
 let submitting = false;        // 注文送信中は、自分の注文で枠が埋まった通知を抑制する
 
+// ---------- 受け取り日時の先行選択（テイクアウト／冷凍のみ。店内は対象外） ----------
+// 2026-11-27 本人決定：商品より先に受け取り日時を選ぶフローに変更する。
+// 当日受付停止や枠の埋まりを、商品を選ぶ前に知らせるため。
+// 日時を選び直しても、カートの中身と入力済みフォームは保持される（状態はモード別に保持）。
+const pickupSel = { takeout: { date: null, time: null }, frozen: { date: null, time: null } };
+let pickupReturn = "menu"; // 日時選択画面から戻る先: "menu" | "checkout"
+function fmtShort(key) { return formatDateJP(key).replace(/^\d+年/, ""); }
+function updatePickupBar() {
+  const bar = $("pickup-bar");
+  if (!bar) return;
+  const p = pickupSel[mode];
+  const vis = mode !== "dinein" && !!p && !!p.time;
+  bar.classList.toggle("hidden", !vis);
+  if (vis) $("pickup-bar-text").textContent = `${fmtShort(p.date)} ${p.time}`;
+}
+// 選択済みの日時が、現在のカート内容では無効になっていないか（同期チェックのみ）。
+// 当日テイクアウトの最短時刻は合計点数で変わるため、カートが増えると選んだ時刻が過去扱いになり得る。
+function pickupProblemSync() {
+  if (mode === "dinein") return null;
+  const p = pickupSel[mode];
+  if (!p || !p.date || !p.time) return { type: "unset", message: "受け取り日時が選ばれていません。日時をお選びください。" };
+  if (mode === "takeout" && p.date === todayKey() && !timeSlots(p.date, cartQty()).includes(p.time)) {
+    const lead = leadMinutes(cartQty());
+    return { type: "lead", message: cartQty() >= 5
+      ? `ご注文点数が増えたため、受け取り時刻 ${p.time} では注文できません。最短で${lead}分後以降の時刻をお選びください。`
+      : `受け取り時刻 ${p.time} は選べなくなりました。日時を選び直してください。` };
+  }
+  return null;
+}
+let leadWarned = false;
+function checkLeadCrossing() {
+  if (mode !== "takeout" || currentScreen !== "scr-order") return;
+  const p = pickupSel.takeout;
+  if (!p || p.date !== todayKey() || !p.time) { leadWarned = false; return; }
+  const invalid = !timeSlots(p.date, cartQty()).includes(p.time);
+  if (invalid && !leadWarned) {
+    leadWarned = true;
+    toast("点数が増えたため、受け取り時刻を選び直す必要があります", 2600);
+  }
+  if (!invalid) leadWarned = false;
+}
+function startPickupFlow(returnTo) {
+  pickupReturn = returnTo;
+  const p = pickupSel[mode];
+  if (p && p.date) { selDate = p.date; selTime = p.time; }
+  else {
+    selDate = mode === "frozen" ? dateChipList().find(k => !isThursday(k)) : todayKey();
+    selTime = null;
+  }
+  $("pickup-title").textContent = p && p.time ? "受け取り日時の変更" : "まず、受け取り日時をお選びください";
+  $("pickup-cart-note").classList.toggle("hidden", cartQty() === 0);
+  renderDateChips($("date-chips"), selDate, pickDate);
+  renderSlots();
+  // 冷凍予約は焼きピザの枠（1枠1注文）を占有しないため、枠の購読はしない
+  if (mode === "frozen") { unwatchSlots(); occupiedTimes = new Set(); renderSlots(); }
+  else watchSlots();
+  show("scr-pickup");
+}
+function finishPickupFlow() { // 「この日時で注文する」
+  if (!selTime) return;
+  pickupSel[mode] = { date: selDate, time: selTime };
+  unwatchSlots();
+  leadWarned = false;
+  if (pickupReturn === "checkout") showCheckout();
+  else { updatePickupBar(); renderTabs(); renderGrid(); show("scr-order"); }
+}
+function backFromPickupFlow() {
+  unwatchSlots();
+  const p = pickupSel[mode];
+  if (p && p.date) { selDate = p.date; selTime = p.time; }
+  if (pickupReturn === "checkout" && p && p.time) showCheckout();
+  else if (pickupReturn === "menu" && p && p.time) { updatePickupBar(); show("scr-order"); }
+  else show("scr-home");
+}
+
 // 選択中の日の注文を購読し、埋まっている枠（1枠1注文）を即時に反映する
 function watchSlots() {
   unwatchSlots();
@@ -538,14 +618,14 @@ function renderCart() {
       </div>`;
     }).join("") + `<div style="text-align:right;font-weight:900;font-size:19px;padding-top:10px;">合計 ${yen(cartTotal())}</div>`;
     $("cart-list").querySelectorAll("[data-inc]").forEach(b => b.addEventListener("click", () => {
-      const c = cart[+b.dataset.inc]; if (c.qty < MAX_QTY) c.qty++; renderCart(); renderSlots(); updateCartbar(false);
+      const c = cart[+b.dataset.inc]; if (c.qty < MAX_QTY) c.qty++; renderCart(); renderSlots(); updateCartbar(false); refreshCheckoutPickupWarn();
     }));
     $("cart-list").querySelectorAll("[data-dec]").forEach(b => b.addEventListener("click", () => {
       const c = cart[+b.dataset.dec]; if (c.qty > 1) c.qty--; else cart.splice(+b.dataset.dec, 1);
-      renderCart(); renderSlots(); updateCartbar(false);
+      renderCart(); renderSlots(); updateCartbar(false); refreshCheckoutPickupWarn();
     }));
     $("cart-list").querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", () => {
-      cart.splice(+b.dataset.del, 1); renderCart(); renderSlots(); updateCartbar(false);
+      cart.splice(+b.dataset.del, 1); renderCart(); renderSlots(); updateCartbar(false); refreshCheckoutPickupWarn();
     }));
   }
   updateSetNotes();
@@ -573,30 +653,74 @@ function renderSlots() {
     ? (isThursday(selDate) ? "木曜日は定休日です。別の日をお選びください。" : "本日の受け取り枠は終了しました。別の日をお選びください。")
     : slots.every(s => occupiedTimes.has(s)) ? "この日の受け取り枠はすべて埋まっています。別の日をお選びください。" : "";
   $("slot-grid").querySelectorAll("button:not(:disabled)").forEach(b =>
-    b.addEventListener("click", () => { selTime = b.dataset.slot; renderSlots(); }));}
-function openCheckout() {
-  if (mode === "frozen") {
-    // 冷凍予約の初期日は翌々日（定休日の木曜ならその翌日）
-    selDate = dateChipList().find(k => !isThursday(k));
-  } else {
-    selDate = todayKey();
+    b.addEventListener("click", () => { selTime = b.dataset.slot; renderSlots(); }));
+  // 日時選択画面の確定ボタンの状態も連動させる
+  const pb = $("pickup-proceed");
+  if (pb) {
+    pb.disabled = !selTime;
+    pb.textContent = selTime ? `この日時で注文する（${fmtShort(selDate)} ${selTime}）` : "時刻をお選びください";
   }
-  selTime = null;
-  sealChoice = null;
+}
+function openCheckout() {
+  // 日時が未選択なら、まず日時選択画面へ（通常はメニュー入場時に選択済み）
+  if (mode !== "dinein" && (!pickupSel[mode] || !pickupSel[mode].time)) { startPickupFlow("checkout"); return; }
+  sealChoice = null; // カートから入り直したときはシール選択をリセット（従来動作）
+  showCheckout();
+}
+let pickupWarnKind = null;
+function setPickupWarn(kind, msg) {
+  pickupWarnKind = kind;
+  const w = $("pickup-warn");
+  if (!w) return;
+  w.textContent = msg || "";
+  w.classList.toggle("hidden", !msg);
+}
+function renderPickupSummary() {
+  const p = pickupSel[mode];
+  $("pickup-summary").textContent = p && p.time ? `${fmtShort(p.date)} ${p.time}` : "未選択";
+}
+// 会計画面の日時警告を、カート増減に合わせて同期チェックだけで更新する
+function refreshCheckoutPickupWarn() {
+  if (mode === "dinein" || currentScreen !== "scr-checkout") return;
+  const prob = pickupProblemSync();
+  if (prob) { setPickupWarn(prob.type, prob.message); return; }
+  if (pickupWarnKind === "lead" || pickupWarnKind === "unset") setPickupWarn(null, "");
+}
+// 会計画面に入った時点の日時チェック（受付停止・枠の埋まりは daySlots を読んで確認する）
+async function validatePickupAtCheckout() {
+  const prob = pickupProblemSync();
+  if (prob) { setPickupWarn(prob.type, prob.message); return; }
+  if (pickupWarnKind === "lead" || pickupWarnKind === "unset") setPickupWarn(null, "");
+  if (mode !== "takeout") return;
+  try {
+    const snap = await getDoc(doc(db, "daySlots", selDate));
+    const data = snap.exists() ? snap.data() : {};
+    if (selDate === todayKey() && data.takeoutStopped) {
+      setPickupWarn("stopped", "本日の注文受付は終了しました。明日以降の日付でご注文いただけます。日時を選び直してください。");
+    } else if ((data.taken || {})[selTime]) {
+      setPickupWarn("taken", "選択した受け取り時刻は、別のご注文が入りました。日時を選び直してください。");
+    } else if (pickupWarnKind === "stopped" || pickupWarnKind === "taken") {
+      setPickupWarn(null, "");
+    }
+  } catch (e) { console.error(e); }
+}
+function showCheckout() {
+  const p = pickupSel[mode];
+  if (p && p.date) { selDate = p.date; selTime = p.time; }
   $("seal-group").classList.toggle("hidden", mode !== "frozen");
   renderSeal();
   renderCart();
-  renderDateChips($("date-chips"), selDate, pickDate);
-  renderSlots();
-  // 冷凍予約は焼きピザの枠（1枠1注文）を占有しないため、枠の購読はしない
-  if (mode === "frozen") { unwatchSlots(); occupiedTimes = new Set(); renderSlots(); }
-  else watchSlots();
+  renderPickupSummary();
+  setPickupWarn(null, "");
+  // 入力済みのフォームは保持する。保存済みの名前・電話は、未入力の欄にだけ補完する
   const savedName = localStorage.getItem("ruberie_name") || "";
   const savedPhone = localStorage.getItem("ruberie_phone") || "";
-  if (savedName) $("cust-name").value = savedName;
-  if (savedPhone) $("cust-phone").value = savedPhone;
+  if (savedName && !$("cust-name").value) $("cust-name").value = savedName;
+  if (savedPhone && !$("cust-phone").value) $("cust-phone").value = savedPhone;
   $("order-error").innerHTML = "";
-  show("scr-checkout");  updateSetNotes();
+  show("scr-checkout");
+  updateSetNotes();
+  validatePickupAtCheckout();
 }
 function pickDate(k) { selDate = k; selTime = null; renderDateChips($("date-chips"), selDate, pickDate); renderSlots(); if (mode !== "frozen") watchSlots(); }
 
@@ -624,6 +748,15 @@ async function submitOrder() {
   const note = $("cust-note").value.trim();
   const err = msg => { $("order-error").innerHTML = `<div class="err" style="margin-top:12px;">${esc(msg)}</div>`; };
   if (cart.length === 0) return err("カートが空です。メニューから商品をお選びください。");
+  // 送信は「最初に選んだ日時」で行う。カート増減で最短時刻を過ぎていないか等をここでも再確認する
+  const pk = pickupSel[mode];
+  if (pk && pk.date) { selDate = pk.date; selTime = pk.time; }
+  const prob = pickupProblemSync();
+  if (prob) {
+    err(prob.message);
+    $("pickup-summary-card").scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
   if (!selTime) return err("受け取り時刻をお選びください。");
   if (mode === "frozen" && !sealChoice) { guideToSealChoice(); return err("温め方のシールが必要かお選びください。"); }
   if (!name) return err("お名前を入力してください。");
@@ -678,13 +811,17 @@ async function submitOrder() {
       } catch (e) {
         if (e && e.message === "today-stopped") {
           btn.disabled = false; btn.textContent = "この内容で注文を送信する";
-          selTime = null; renderSlots();
-          return err("本日の注文受付が終了したため、注文できませんでした。日付を変えてお試しください。");
+          // カートとフォームは保持したまま、日時だけ選び直してもらう
+          toast("本日の注文受付が終了したため、注文できませんでした。日時を選び直してください", 4000);
+          startPickupFlow("checkout");
+          return;
         }
         if (e && e.message === "slot-taken") {
           btn.disabled = false; btn.textContent = "この内容で注文を送信する";
-          selTime = null; renderSlots();
-          return err("申し訳ありません。その受け取り時刻は別のご注文が入りました。別の時刻をお選びください。");
+          // カートとフォームは保持したまま、日時だけ選び直してもらう
+          toast("その受け取り時刻は別のご注文が入りました。別の時刻をお選びください", 4000);
+          startPickupFlow("checkout");
+          return;
         }
         throw e;
       }
@@ -1065,7 +1202,16 @@ document.querySelectorAll(".guide-toggle").forEach(btn => {
   });
 });
 
-$("go-order").addEventListener("click", () => { setMode("takeout"); currentCat = "seasonal"; renderTabs(); renderGrid(); show("scr-order"); });
+$("go-order").addEventListener("click", () => {
+  setMode("takeout"); currentCat = "seasonal";
+  // 日時が選択済みならそのままメニューへ。未選択なら最初に日時を選んでもらう
+  if (pickupSel.takeout.time) { updatePickupBar(); renderTabs(); renderGrid(); show("scr-order"); }
+  else startPickupFlow("menu");
+});
+$("pickup-proceed").addEventListener("click", finishPickupFlow);
+$("pickup-back").addEventListener("click", backFromPickupFlow);
+$("pickup-change").addEventListener("click", () => startPickupFlow("menu"));
+$("change-pickup").addEventListener("click", () => startPickupFlow("checkout"));
 function renderSeal() {
   const y = $("seal-yes"), n = $("seal-no");
   if (!y || !n) return;
@@ -1074,7 +1220,11 @@ function renderSeal() {
 }
 $("seal-yes").addEventListener("click", () => { sealChoice = "need"; renderSeal(); });
 $("seal-no").addEventListener("click", () => { sealChoice = "none"; renderSeal(); });
-$("go-frozen").addEventListener("click", () => { setMode("frozen"); currentCat = "fz-set"; renderTabs(); renderGrid(); show("scr-order"); });
+$("go-frozen").addEventListener("click", () => {
+  setMode("frozen"); currentCat = "fz-set";
+  if (pickupSel.frozen.time) { updatePickupBar(); renderTabs(); renderGrid(); show("scr-order"); }
+  else startPickupFlow("menu");
+});
 $("seat-back").addEventListener("click", () => { setMode("takeout"); show("scr-home"); });
 $("dinein-back").addEventListener("click", () => show("scr-order"));
 $("submit-dinein").addEventListener("click", submitDinein);

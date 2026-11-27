@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>るべりえ 注文サイト</title>
-<link rel="stylesheet" href="css/style.css?v=20251127-97">
+<link rel="stylesheet" href="css/style.css?v=20251127-98">
 </head>
 <body>
 <div class="tricolor"></div>
@@ -119,10 +119,33 @@
         <p class="note">お持ち帰り専用の注文ページへ移動します</p>
       </div>
     </div>
+    <div id="pickup-bar" class="pickup-bar hidden">
+      <span class="pickup-bar-label">お受け取り：</span><strong id="pickup-bar-text"></strong>
+      <button id="pickup-change" type="button">変更</button>
+    </div>
     <div id="frozen-banner" class="frozen-banner hidden">🧊 ご来店の際は、保冷バッグと保冷剤をご持参ください（冷凍ピザのお持ち帰り用です）</div>
     <p class="order-guide hidden" id="order-guide">ご注文は下のメニューから商品をお選びください</p>
     <div class="tabs" id="cat-tabs"></div>
     <div class="grid" id="item-grid"></div>
+  </section>
+
+  <!-- 受け取り日時（テイクアウト／冷凍の最初のステップ） -->
+  <section id="scr-pickup" class="hidden">
+    <button class="btn ghost small" id="pickup-back">← 戻る</button>
+    <h2 id="pickup-title" style="margin:14px 0 6px;">まず、受け取り日時をお選びください</h2>
+    <p class="note hidden" id="pickup-cart-note" style="font-weight:800;">カートの中身はそのまま残ります。日時のみ変更します。</p>
+    <div id="frozen-banner0" class="frozen-banner hidden">🧊 ご来店の際は、保冷バッグと保冷剤をご持参ください（冷凍ピザのお持ち帰り用です）</div>
+    <div class="field">
+      <label>受け取り日</label>
+      <div class="date-chips" id="date-chips"></div>
+    </div>
+    <div class="field">
+      <label>受け取り時刻</label>
+      <p class="note" id="lead-note" style="margin:0 0 8px;"></p>
+      <div class="slot-grid" id="slot-grid"></div>
+      <p class="note" id="slot-empty" style="margin-top:8px;"></p>
+    </div>
+    <button class="btn" id="pickup-proceed" disabled>時刻をお選びください</button>
   </section>
 
   <!-- 商品詳細 -->
@@ -139,15 +162,10 @@
     <div class="card" id="cart-list"></div>
     <div id="set-note" class="set-note hidden">🍕 平日セットの時間帯です。揚げ物をサービスでお付けします。</div>
     <h2 style="margin:18px 0 6px;">受け取り日時</h2>
-    <div class="field">
-      <label>受け取り日</label>
-      <div class="date-chips" id="date-chips"></div>
-    </div>
-    <div class="field">
-      <label>受け取り時刻</label>
-      <p class="note" id="lead-note" style="margin:0 0 8px;"></p>
-      <div class="slot-grid" id="slot-grid"></div>
-      <p class="note" id="slot-empty" style="margin-top:8px;"></p>
+    <div class="card" id="pickup-summary-card">
+      <div style="font-size:19px;font-weight:900;">お受け取り：<span id="pickup-summary">未選択</span></div>
+      <div id="pickup-warn" class="pickup-warn hidden"></div>
+      <button class="btn ghost small" id="change-pickup" type="button" style="margin-top:10px;">日時を変更する</button>
     </div>
     <div id="seal-group" class="hidden">
       <h2 style="margin:18px 0 6px;">温め方のシール</h2>
@@ -265,6 +283,6 @@
 <div class="toast" id="toast"></div>
 
 <script src="js/qrcode.js"></script>
-<script type="module" src="js/customer.js?v=20251127-106"></script>
+<script type="module" src="js/customer.js?v=20251127-107"></script>
 </body>
 </html>

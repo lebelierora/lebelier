@@ -91,6 +91,15 @@ main{max-width:720px;margin:0 auto;padding:14px 14px 120px;}
 .slot-grid button:disabled{opacity:.5;cursor:not-allowed;background:#f0e7d8;}
 .slot-grid button .full-label{display:block;font-size:11px;color:var(--warn);font-weight:800;}
 
+/* 受け取り日時バー（メニュー画面の上部に選択済み日時を常時表示） */
+.pickup-bar{display:flex;align-items:center;gap:8px;background:#fff3d6;border:2px solid #e0a63e;border-radius:14px;padding:10px 14px;margin:0 0 12px;font-size:16px;}
+.pickup-bar .pickup-bar-label{font-weight:800;white-space:nowrap;}
+.pickup-bar strong{font-size:17px;}
+.pickup-bar button{margin-left:auto;flex:0 0 auto;border:2px solid var(--line);background:#fff;border-radius:10px;padding:9px 18px;font-size:15px;font-weight:800;}
+
+/* 会計画面の日時警告（選び直しが必要なときに表示） */
+.pickup-warn{margin-top:10px;background:#fdedec;border:2px solid var(--warn);color:var(--warn);border-radius:12px;padding:10px 12px;font-weight:800;line-height:1.55;font-size:15px;}
+
 /* フォーム */
 .field{margin:14px 0;}
 .field label{display:block;font-weight:800;margin-bottom:6px;}
