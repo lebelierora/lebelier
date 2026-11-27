@@ -277,12 +277,14 @@ function descHtml(it) {
     return `<div class="desc-block">${descParas(main)}${allergy ? allergyHtml(allergy) : ""}` +
       (long ? `<button type="button" class="desc-toggle" id="desc-toggle">閉じる</button>` : "") + `</div>`;
   }
-  // 折りたたみ時：文の区切りを崩さず、目安字数までの文だけ見せる
+  // 折りたたみ時：文の区切りを崩さず、目安字数までの文だけ見せる。
+  // ただしアレルギー表示（特定原材料〜）は折りたたみ時も常に表示する（2026-11-27 改善）。
   const sentences = main.split(/(?<=。)/).map(s => s.trim()).filter(Boolean);
   const shown = [];
   let len = 0;
   for (const s of sentences) { shown.push(s); len += s.length; if (len >= DESC_PREVIEW) break; }
   return `<div class="desc-block">${shown.map(s => `<p class="desc-p">${esc(s)}</p>`).join("")}` +
+    (allergy ? allergyHtml(allergy) : "") +
     `<button type="button" class="desc-toggle" id="desc-toggle">さらに表示する</button></div>`;
 }
 
@@ -510,8 +512,7 @@ function renderDetail() {
       <div class="stepper">
         <button id="qty-minus">−</button><div class="qty">${detail.qty}</div><button id="qty-plus">＋</button>
       </div>
-    </div>
-    <button class="btn" id="add-cart">カートに入れる　${yen(detailUnit() * detail.qty)}</button>`;
+    </div>`;
   $("detail-body").innerHTML = html;
 
   if (hasCutPack(it) && $("cut-nocut")) {
@@ -534,7 +535,8 @@ function renderDetail() {
     b.addEventListener("click", () => { detail.timing = b.dataset.timing; renderDetail(); }));
   $("qty-minus").addEventListener("click", () => { if (detail.qty > 1) detail.qty--; renderDetail(); });
   $("qty-plus").addEventListener("click", () => { if (detail.qty < MAX_QTY) detail.qty++; renderDetail(); });
-  $("add-cart").addEventListener("click", tryAddDetailToCart);
+  // 「カートに入れる」は下部固定バー（detailbar-add）のみ。本文中の重複ボタンは廃止（2026-11-27 改善）。
+  // 未選択チェック（カット・包装・選択肢・タイミング・早割）は tryAddDetailToCart 内で共通に効く。
   updateDetailbar();
   setupDetailScrollHint();
 }
