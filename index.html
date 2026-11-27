@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>るべりえ 注文サイト</title>
-<link rel="stylesheet" href="css/style.css?v=20251127-95">
+<link rel="stylesheet" href="css/style.css?v=20251127-96">
 </head>
 <body>
 <div class="tricolor"></div>
@@ -111,10 +111,13 @@
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span style="font-weight:900;font-size:18px;">お席：<span id="dinein-seat-label"></span></span>
       </div>
+      <p class="dinein-order-guide">ご注文は下のメニューから商品をお選びください</p>
       <button class="btn" id="call-btn-order" style="margin-top:12px;">店員を呼ぶ</button>
       <p class="note" id="call-msg-order" style="margin:8px 0 0;"></p>
-      <a class="btn ghost" id="to-takeout" href="index.html" style="margin-top:14px;text-align:center;text-decoration:none;">テイクアウトのご注文はこちら</a>
-      <p class="note" style="margin:8px 0 0;">お持ち帰りのご注文は、こちらのページからどうぞ</p>
+      <div class="takeout-link-wrap">
+        <a id="to-takeout" href="index.html">テイクアウトのご注文はこちら</a>
+        <p class="note">お持ち帰り専用の注文ページへ移動します</p>
+      </div>
     </div>
     <div id="frozen-banner" class="frozen-banner hidden">🧊 ご来店の際は、保冷バッグと保冷剤をご持参ください（冷凍ピザのお持ち帰り用です）</div>
     <div class="tabs" id="cat-tabs"></div>

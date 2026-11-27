@@ -22,10 +22,16 @@ main{max-width:720px;margin:0 auto;padding:14px 14px 120px;}
 .err{background:#fdedec;border:2px solid var(--warn);color:var(--warn);border-radius:12px;padding:12px;font-weight:700;line-height:1.6;}
 .hidden{display:none !important;}
 
-/* カテゴリタブ */
-.tabs{display:flex;gap:8px;overflow-x:auto;padding:4px 0 10px;}
-.tabs button{flex:0 0 auto;border:2px solid var(--line);background:#fff;border-radius:999px;padding:10px 16px;font-size:15px;font-weight:700;}
+/* カテゴリタブ（横スクロールせず、全カテゴリを折り返して表示する） */
+.tabs{display:flex;flex-wrap:wrap;gap:8px;padding:4px 0 10px;}
+.tabs button{flex:0 1 auto;max-width:100%;border:2px solid var(--line);background:#fff;border-radius:999px;padding:10px 16px;font-size:15px;font-weight:700;}
 .tabs button.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+
+/* 店内バー：注文の入口を明示し、テイクアウト導線は控えめなリンクにする */
+.dinein-order-guide{margin:12px 0 0;font-size:17px;font-weight:800;line-height:1.5;}
+.takeout-link-wrap{margin-top:14px;padding-top:10px;border-top:1px dashed var(--line);font-size:14px;}
+.takeout-link-wrap a{color:#1a6fb5;font-weight:700;text-decoration:underline;text-underline-offset:3px;}
+.takeout-link-wrap .note{margin:4px 0 0;}
 
 /* 商品グリッド */
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
