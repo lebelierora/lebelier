@@ -249,6 +249,7 @@ export const DATE_OVERRIDES = {
   "2027-01-05": { closed: true, reason: "年始休業" },
   "2027-01-06": { closed: true, reason: "年始休業" },
   "2027-01-07": { closed: true, reason: "年始休業" },
+  "2027-01-08": { closed: true, reason: "受付お休み" }, // 営業再開日だがモバイルオーダーは受付お休み（休み中に溜まった注文が再開日11時に集中するのを避けるため。本人決定 2026-11-27）。お店は営業、受け取りは1/9から
 };
 export function dateOverride(key) { return DATE_OVERRIDES[key] || null; }
 
@@ -271,15 +272,15 @@ export function closedReason(key) {
 }
 
 // 予約を受け付ける最終日。通常は「今日から7日先（+7）」までだが、年末年始は一時的に
-// 2027-01-03 まで延長する（2026-11-27 本人指示）。ただし最終日は EXTEND_CAP（2027-01-08＝
-// 年始の営業再開日）で頭打ちにする（同日本人指示「1月8日で止めとけば」）。年明けに本人が
-// 以降の受付をどうするか決めるまで、1/8 より先の日付は予約できない。
+// 2027-01-03 まで延長する（2026-11-27 本人指示）。today+7 が EXTEND_UNTIL を過ぎたら
+// 自動で通常ルールに戻る（自己失効型の延長）。
+// ※1/8は営業再開日だが、休み中に溜まった注文が再開日の11時に集中するのを避けるため、
+//   モバイルオーダーの受け取りは DATE_OVERRIDES で「受付お休み」にしてある（本人決定 2026-11-27）。
+//   受け取りの再開は1/9から（通常ルール）。
 export const EXTEND_UNTIL = "2027-01-03";
-export const EXTEND_CAP = "2027-01-08";
 export function bookingEndKey() {
   const rolling = addDays(todayKey(), 7).key;
-  const end = rolling > EXTEND_UNTIL ? rolling : EXTEND_UNTIL;
-  return end > EXTEND_CAP ? EXTEND_CAP : end;
+  return rolling > EXTEND_UNTIL ? rolling : EXTEND_UNTIL;
 }
 
 // 早割（advanceOnly）商品の注文可否を返す。

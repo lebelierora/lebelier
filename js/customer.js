@@ -8,7 +8,7 @@ import {
   todayKey, addDays, formatDateJP, isClosedDay, closedReason, timeSlots, leadMinutes,
   normalizePhone, esc, yen, SEATS, seatLabel, toMin, bookingEndKey, advanceGate,
   AGE_FESTIVAL, isAgeFestival,
-} from "./menu.js?v=20251127-113";
+} from "./menu.js?v=20251127-114";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
 } from "./frozen-menu.js?v=20251127-112";
@@ -724,7 +724,7 @@ function renderSlots() {
   $("slot-empty").textContent = stoppedToday
     ? "本日の注文受付は終了しました。明日以降の日付でご注文いただけます。"
     : slots.length === 0
-    ? (isClosedDay(selDate) ? (closedReason(selDate) === "定休日" ? "木曜日は定休日です。別の日をお選びください。" : `${closedReason(selDate)}のためお休みです。別の日をお選びください。`) : "本日の受け取り枠は終了しました。別の日をお選びください。")
+    ? (isClosedDay(selDate) ? (closedReason(selDate) === "定休日" ? "木曜日は定休日です。別の日をお選びください。" : closedReason(selDate) === "受付お休み" ? "この日はモバイルオーダーの受付をお休みしています。別の日をお選びください。" : `${closedReason(selDate)}のためお休みです。別の日をお選びください。`) : "本日の受け取り枠は終了しました。別の日をお選びください。")
     : slots.every(s => occupiedTimes.has(s)) ? "この日の受け取り枠はすべて埋まっています。別の日をお選びください。" : "";
   $("slot-grid").querySelectorAll("button:not(:disabled)").forEach(b =>
     b.addEventListener("click", () => { selTime = b.dataset.slot; renderSlots(); }));
