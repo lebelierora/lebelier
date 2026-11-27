@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>るべりえ 注文サイト</title>
-<link rel="stylesheet" href="css/style.css?v=20251127-107">
+<link rel="stylesheet" href="css/style.css?v=20251127-108">
 </head>
 <body>
 <div class="tricolor"></div>
@@ -19,9 +19,9 @@
   <section id="scr-home">
     <div class="logo-banner"><img src="images/shop-banner.jpg" alt="るべりえ 店舗外観"></div>
     <button class="btn" id="go-order" style="margin-bottom:4px;">出来立てメニューを注文する</button>
-    <p class="note" style="margin:0 0 12px;">店内でお召し上がりの方は、お席のQRコードからご注文ください。</p>
+    <p class="note entry-note" style="margin:0 0 14px;">店内でお召し上がりの方は、お席のQRコードからご注文ください。</p>
     <button class="btn" id="go-frozen" style="margin-bottom:4px;">冷凍ピザを店頭で受け取る</button>
-    <p class="note" style="margin:0 0 12px;">受け取りは翌々日から選べます</p>
+    <p class="note entry-note" style="margin:0 0 14px;">受け取りは翌々日から選べます</p>
     <button class="btn ghost" id="go-status">注文状況を見る</button>
     <div class="card" style="margin-top:16px;">
       <p class="note" style="margin:0;">
@@ -125,7 +125,7 @@
       <span class="pickup-bar-label">お受け取り：</span><strong id="pickup-bar-text"></strong>
       <button id="pickup-change" type="button">変更</button>
     </div>
-    <div id="frozen-banner" class="frozen-banner hidden">🧊 ご来店の際は、保冷バッグと保冷剤をご持参ください（冷凍ピザのお持ち帰り用です）</div>
+    <div id="frozen-banner" class="frozen-bag-note hidden">🧊 保冷バッグ・保冷剤をご持参ください</div>
     <p class="order-guide hidden" id="order-guide">ご注文は下のメニューから商品をお選びください</p>
     <div class="tabs" id="cat-tabs"></div>
     <div id="festival-banner" class="festival-banner hidden"></div>
@@ -137,7 +137,7 @@
     <button class="btn ghost small" id="pickup-back">← 戻る</button>
     <h2 id="pickup-title" style="margin:14px 0 6px;">まず、受け取り日時をお選びください</h2>
     <p class="note hidden" id="pickup-cart-note" style="font-weight:800;">カートの中身はそのまま残ります。日時のみ変更します。</p>
-    <div id="frozen-banner0" class="frozen-banner hidden">🧊 ご来店の際は、保冷バッグと保冷剤をご持参ください（冷凍ピザのお持ち帰り用です）</div>
+    <div id="frozen-banner0" class="frozen-bag-note hidden">🧊 保冷バッグ・保冷剤をご持参ください</div>
     <div class="field">
       <label>受け取り日</label>
       <div class="date-chips" id="date-chips"></div>
@@ -255,8 +255,10 @@
 
 <!-- 下部カートバー -->
 <div class="cartbar hidden" id="cartbar">
-  <div class="info" id="cartbar-info">カートは空です</div>
-  <button id="cartbar-btn">カートを見る<span class="cart-badge hidden" id="cart-badge">0</span></button>
+  <div class="cartbar-inner">
+    <div class="info" id="cartbar-info">カートは空です</div>
+    <button id="cartbar-btn">カートを見る<span class="cart-badge hidden" id="cart-badge">0</span></button>
+  </div>
 </div>
 
 <!-- メニュー画面専用：上へ戻るボタン（カートバーの上に重ならない位置に出す） -->
@@ -291,6 +293,6 @@
 <div class="toast" id="toast"></div>
 
 <script src="js/qrcode.js"></script>
-<script type="module" src="js/customer.js?v=20251127-125"></script>
+<script type="module" src="js/customer.js?v=20251127-126"></script>
 </body>
 </html>

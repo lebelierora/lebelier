@@ -300,7 +300,7 @@ function updateDetailbar() {
   const price = $("detailbar-price");
   if (!price) return;
   const unit = detailUnit();
-  price.textContent = yen(unit * detail.qty);
+  price.textContent = `小計 ${yen(unit * detail.qty)}`;
   $("detailbar-sub").textContent = detail.qty > 1 ? `${yen(unit)} × ${detail.qty}点` : `数量 ${detail.qty}`;
 }
 let choiceGuideTimer = null;
@@ -311,7 +311,10 @@ function guideToRequiredChoice() {
   group.classList.add("attention");
   const alert = $("choice-alert");
   if (alert) alert.classList.remove("hidden");
-  toast("まずこちらをお選びください", 1800);
+  const choiceName = detail && detail.item.choice
+    ? (mode === "takeout" && detail.item.choice.labelTakeout ? detail.item.choice.labelTakeout : detail.item.choice.label)
+    : "こちら";
+  toast(`${choiceName}を選んでください`, 1800);
   clearTimeout(choiceGuideTimer);
   choiceGuideTimer = setTimeout(() => {
     group.classList.remove("attention");
@@ -443,7 +446,7 @@ function renderDetail() {
       <div style="padding:14px;">
         <div style="font-size:20px;font-weight:900;">${esc(it.name)}${it.seasonal ? ` <span class="season-badge">季節メニュー</span>` : ""}${it.eatInBadge ? ` <span class="eatin-badge">イートイン限定</span>` : ""}${mode !== "frozen" && it.cat === AGE_FESTIVAL.cat && isAgeFestival(todayKey()) ? ` <span class="festival-badge">期間限定</span>` : ""}</div>
         ${descHtml(it)}
-        <div style="font-weight:900;font-size:19px;margin-top:8px;">${yen(it.price)}</div>
+        <div style="font-weight:900;font-size:19px;margin-top:8px;">基本価格 ${yen(it.price)}</div>
       </div>
     </div>`;
   if (advanceBlocked(it)) {
@@ -466,27 +469,27 @@ function renderDetail() {
     } else {
     html += `
     <div class="opt-group" id="cut-group">
-      <div class="label">カット</div>
+      <div class="label">カット ［必須］</div>
       <div class="opt-row">
         <button id="cut-nocut" class="${detail.cut === "nocut" ? "active" : ""}">未カット</button>
         <button id="cut-cut4" class="${detail.cut === "cut4" ? "active" : ""}" ${detail.pack === "box" ? "disabled" : ""}>4カット</button>${mode === "dinein" && (it.cat === "hall" || it.cat === "sweetpizza") ? `<button id="cut-cut6" class="${detail.cut === "cut6" ? "active" : ""}">6カット</button>` : ""}
       </div>
       ${detail.pack === "box" ? `<div class="opt-note">箱はカットなしのお渡しです</div>` : ""}
-      ${detail.cut ? "" : `<div class="opt-note">お選びください（必須）</div><div class="choice-alert hidden" id="cut-alert">カットの仕方をお選びください</div>`}
+      ${detail.cut ? "" : `<div class="choice-alert hidden" id="cut-alert">カットの仕方をお選びください</div>`}
     </div>`;
     }
     // 包装（箱）はテイクアウトのみ。店内では出さない
     if (mode === "takeout") {
       html += `
     <div class="opt-group" id="pack-group">
-      <div class="label">包装</div>
+      <div class="label">包装 ［必須］</div>
       <div class="opt-row">
         <button id="pack-paper" class="${detail.pack === "paper" ? "active" : ""}">紙皿・ホイル（無料）</button>
         <button id="pack-box" class="${detail.pack === "box" ? "active" : ""}" ${boxDisabled ? "disabled" : ""}>箱入り・カットなし（+100円）</button>
       </div>
       ${it.noBox ? `<div class="opt-note">バターがこぼれやすいため、箱での提供はしていません</div>`
                  : boxDisabledByCut ? `<div class="opt-note">箱はカットなしのお渡しです</div>` : ""}
-      ${detail.pack ? "" : `<div class="opt-note">お選びください（必須）</div><div class="choice-alert hidden" id="pack-alert">包装をお選びください</div>`}
+      ${detail.pack ? "" : `<div class="choice-alert hidden" id="pack-alert">包装をお選びください</div>`}
     </div>`;
     }
   }
@@ -494,10 +497,10 @@ function renderDetail() {
     if (detail.choice && !visibleOptions.some(o => o.label === detail.choice)) detail.choice = null;
     if (!detail.choice && visibleOptions.length === 1) detail.choice = visibleOptions[0].label; // 残り1つなら自動選択
     const choiceLabel = mode === "takeout" && it.choice.labelTakeout ? it.choice.labelTakeout : it.choice.label;
-    html += `<div class="opt-group" id="choice-group"><div class="label">${esc(choiceLabel)}</div><div class="opt-row">` +
+    html += `<div class="opt-group" id="choice-group"><div class="label">${esc(choiceLabel)} ［必須］</div><div class="opt-row">` +
       visibleOptions.map(o => `
         <button data-choice="${esc(o.label)}" class="${detail.choice === o.label ? "active" : ""}">${esc(o.label)}${o.delta ? ` <span style="color:var(--red-dark);">${o.delta > 0 ? "+" : "−"}${yen(Math.abs(o.delta))}</span>` : ""}</button>`).join("") +
-      `</div>${detail.choice ? "" : `<div class="opt-note">お選びください（必須）</div><div class="choice-alert hidden" id="choice-alert">まずこちらをお選びください</div>`}</div>`;
+      `</div>${detail.choice ? "" : `<div class="choice-alert hidden" id="choice-alert">${esc(choiceLabel)}を選んでください</div>`}</div>`;
   }
   // dineInOnly のトッピングは店内モードでのみ表示する（テイクアウトでは出さない）
   const visibleToppings = (it.toppings || []).filter(t => (mode === "dinein" || !t.dineInOnly) && (!t.onlyChoice || detail.choice === t.onlyChoice));
@@ -514,9 +517,9 @@ function renderDetail() {
   }
   const topts = timingOptions(it);
   if (topts) {
-    html += `<div class="opt-group" id="timing-group"><div class="label">提供のタイミング</div><div class="opt-row">` +
+    html += `<div class="opt-group" id="timing-group"><div class="label">提供のタイミング ［必須］</div><div class="opt-row">` +
       topts.map(t => `<button data-timing="${esc(t)}" class="${detail.timing === t ? "active" : ""}">${esc(t)}</button>`).join("") +
-      `</div>${detail.timing ? "" : `<div class="opt-note">お選びください（必須）</div><div class="choice-alert hidden" id="timing-alert">提供のタイミングをお選びください</div>`}</div>`;
+      `</div>${detail.timing ? "" : `<div class="choice-alert hidden" id="timing-alert">提供のタイミングをお選びください</div>`}</div>`;
   }
   html += `
     <div class="opt-group">

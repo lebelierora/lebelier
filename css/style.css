@@ -21,6 +21,8 @@ main{max-width:720px;margin:0 auto;padding:14px 14px 120px;}
 .btn:disabled{opacity:.45;cursor:not-allowed;}
 .card{background:var(--card);border:2px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px;}
 .note{font-size:13px;color:var(--muted);line-height:1.6;}
+/* トップの注文ボタン直下の補足2行だけ、注文方法を左右するので大きめ・濃い色にする */
+.entry-note{font-size:15px;color:var(--ink);}
 .err{background:#fdedec;border:2px solid var(--warn);color:var(--warn);border-radius:12px;padding:12px;font-weight:700;line-height:1.6;}
 .hidden{display:none !important;}
 
@@ -137,7 +139,9 @@ a[href^="tel:"]{color:#1a6fb5;font-weight:700;text-decoration:underline;text-und
 .field textarea{min-height:64px;resize:vertical;}
 
 /* 下部カートバー */
-.cartbar{position:fixed;left:0;right:0;bottom:0;background:var(--ink);color:#fff;padding:12px 16px calc(12px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:12px;z-index:40;}
+.cartbar{position:fixed;left:0;right:0;bottom:0;background:var(--ink);color:#fff;z-index:40;}
+/* 帯は全幅のまま、中身だけ商品一覧のカラム（main と同じ max-width:720px・左右14px）に揃える */
+.cartbar-inner{display:flex;align-items:center;gap:12px;max-width:720px;margin:0 auto;padding:12px 14px calc(12px + env(safe-area-inset-bottom));}
 .cartbar .info{flex:1;font-weight:800;font-size:16px;}
 .cartbar button{background:var(--red);color:#fff;border:none;border-radius:12px;padding:13px 20px;font-size:16px;font-weight:800;position:relative;}
 .cart-badge{position:absolute;top:-8px;right:-8px;background:#f39c12;color:#fff;border-radius:999px;min-width:26px;height:26px;line-height:26px;text-align:center;font-size:14px;font-weight:800;padding:0 6px;}
@@ -172,6 +176,8 @@ a[href^="tel:"]{color:#1a6fb5;font-weight:700;text-decoration:underline;text-und
 .mini-stepper{display:flex;align-items:center;gap:8px;}
 .mini-stepper button{width:36px;height:36px;border-radius:50%;border:2px solid var(--line);background:#fff;font-size:18px;font-weight:800;}
 .del-btn{background:none;border:none;color:var(--warn);font-weight:700;font-size:13px;}
+/* ステッパー内の「削除」だけは円形にせず、横長のピル形で1行に収める（.mini-stepper button より詳細度を上げる） */
+.mini-stepper .del-btn{width:auto;height:36px;border-radius:999px;padding:0 14px;white-space:nowrap;margin-left:8px;font-size:14px;flex:0 0 auto;}
 
 /* 席選択（店内） */
 .seat-grid{display:flex;flex-direction:column;gap:10px;}
@@ -201,6 +207,8 @@ body.frozen .item .noimg{aspect-ratio:4/3;}
 
 /* 冷凍予約の保冷バッグ持参のお願い（目立つバナー） */
 .frozen-banner{background:#fff4e0;border:2px solid #e07b00;border-radius:12px;padding:12px 14px;margin:0 0 12px;font-size:16px;font-weight:700;line-height:1.5;color:#7a3e00;}
+/* 冷凍フロー上部（メニュー／日時選択）の保冷バッグ案内は、日時の強調と競合しないよう枠・太字なしの通常テキスト1行にする */
+.frozen-bag-note{font-size:14px;line-height:1.6;color:var(--ink);margin:0 0 12px;}
 
 /* 遊び心（色と形のみ・本人選択 2026-11-25） */
 .tricolor{height:6px;background:linear-gradient(90deg,#1e8449 0 33.4%,#fdf6ec 33.4% 66.7%,#c0392b 66.7% 100%);}
