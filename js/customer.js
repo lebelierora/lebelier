@@ -758,8 +758,9 @@ function renderSlots() {
   if (stoppedToday) selTime = null;
   if (selTime && (!slots.includes(selTime) || occupiedTimes.has(selTime))) selTime = null;
   const lead = leadMinutes(cartQty());
-  $("lead-note").textContent = mode === "frozen"
-    ? `冷凍ピザはご用意に時間がかかるため、受け取りは翌々日から${formatDateJP(bookingEndKey())}までです。日時はご希望として受け付け、お店が確認して確定します。当日・翌日にお急ぎの場合はお電話ください（0276-70-2321）。`
+  // innerHTML で設定するが、全分岐とも静的文＋内部生成の日付・数字のみで、ユーザー入力は含まれない
+  $("lead-note").innerHTML = mode === "frozen"
+    ? `冷凍ピザはご用意に時間がかかるため、受け取りは翌々日から${formatDateJP(bookingEndKey())}までです。日時はご希望として受け付け、お店が確認して確定します。当日・翌日にお急ぎの場合はお電話ください（<a href="tel:0276702321">0276-70-2321</a>）。`
     : selDate === todayKey()
     ? (cartQty() >= 5 ? `ご注文点数が多いため、最短で${lead}分後からの受け取りになります。` : `最短で${lead}分後からの受け取りになります。`)
     : slots.length > 0
@@ -870,6 +871,8 @@ async function submitOrder() {
   const phone = normalizePhone($("cust-phone").value);
   const note = $("cust-note").value.trim();
   const err = msg => { $("order-error").innerHTML = `<div class="err" style="margin-top:12px;">${esc(msg)}</div>`; };
+  // 電話番号リンクを含む固定文専用（エスケープしないので、ユーザー入力を含む文には使わないこと）
+  const errHtml = html => { $("order-error").innerHTML = `<div class="err" style="margin-top:12px;">${html}</div>`; };
   if (cart.length === 0) return err("カートが空です。メニューから商品をお選びください。");
   // 送信は「最初に選んだ日時」で行う。カート増減で最短時刻を過ぎていないか等をここでも再確認する
   const pk = pickupSel[mode];
@@ -893,7 +896,7 @@ async function submitOrder() {
     const blockedSnap = await getDoc(doc(db, "blockedPhones", phone));
     if (blockedSnap.exists()) {
       btn.disabled = false; btn.textContent = "この内容で注文を送信する";
-      return err("この番号でのご注文はお受けできません。お電話でご注文ください（0276-70-2321）");
+      return errHtml(`この番号でのご注文はお受けできません。お電話でご注文ください（<a href="tel:0276702321">0276-70-2321</a>）`);
     }
     const items = cart.map(c => {
       const it = anyById(c.itemId);
@@ -1075,10 +1078,10 @@ function showDone(docId, orderNo) {
       html += `<h2 style="margin:8px 0;">お渡し済みです。ありがとうございました</h2>`;
     } else if (o.status === "noshow") {
       html += `<h2 style="margin:8px 0;">このご注文は「来店なし」として処理されました</h2>
-        <p class="note">ご不明な点はお電話ください（0276-70-2321）。</p>`;
+        <p class="note">ご不明な点はお電話ください（<a href="tel:0276702321">0276-70-2321</a>）。</p>`;
     } else if (o.status === "cancelled") {
       html += `<h2 style="margin:8px 0;">このご注文は取り消しになりました</h2>
-        <p class="note">ご不明な点はお電話ください（0276-70-2321）。</p>`;
+        <p class="note">ご不明な点はお電話ください（<a href="tel:0276702321">0276-70-2321</a>）。</p>`;
     }
     html += `<div style="margin-top:14px;"><div style="font-weight:800;">注文番号</div><div style="font-weight:900;font-size:40px;letter-spacing:.06em;line-height:1.15;">${esc(orderCodeFromId(docId))}</div></div>
     <p class="note" style="margin-top:8px;">

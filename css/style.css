@@ -43,6 +43,8 @@ main{max-width:720px;margin:0 auto;padding:14px 14px 120px;}
 .dinein-order-guide{margin:12px 0 0;font-size:17px;font-weight:800;line-height:1.5;}
 .takeout-link-wrap{margin-top:14px;padding-top:10px;border-top:1px dashed var(--line);font-size:14px;}
 .takeout-link-wrap a{color:#1a6fb5;font-weight:700;text-decoration:underline;text-underline-offset:3px;}
+/* 電話番号リンク（タップで発信）。全ページ共通で見た目を揃える */
+a[href^="tel:"]{color:#1a6fb5;font-weight:700;text-decoration:underline;text-underline-offset:3px;}
 .takeout-link-wrap .note{margin:4px 0 0;}
 
 /* 商品グリッド */
