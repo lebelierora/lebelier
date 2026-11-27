@@ -25,6 +25,9 @@ main{max-width:720px;margin:0 auto;padding:14px 14px 120px;}
 .hidden{display:none !important;}
 
 /* カテゴリタブ（横スクロールせず、全カテゴリを折り返して表示する） */
+/* メニュー画面ではスクロールしてもカテゴリを上部に固定する（下の商品が透けないよう背景を付ける）。
+   上には受け取り日時バー（.pickup-bar、通常フロー）があり、タブはその下に残る形になる */
+#scr-order .tabs{position:sticky;top:0;z-index:20;background:var(--paper);margin:0 -4px;padding-left:4px;padding-right:4px;}
 .tabs{display:flex;flex-wrap:wrap;gap:8px;padding:4px 0 10px;}
 .tabs button{flex:0 1 auto;max-width:100%;border:2px solid var(--line);background:#fff;border-radius:999px;padding:10px 16px;font-size:15px;font-weight:700;}
 .tabs button.active{background:var(--ink);color:#fff;border-color:var(--ink);}
@@ -98,6 +101,16 @@ main{max-width:720px;margin:0 auto;padding:14px 14px 120px;}
 .date-chips button.active{background:var(--ink);color:#fff;border-color:var(--ink);}
 .date-chips button:disabled{opacity:.45;}
 .date-chips .today-badge{font-size:11px;background:var(--red);color:#fff;border-radius:999px;padding:1px 8px;margin-left:8px;}
+/* 日時選択画面の日付リスト開閉ボタン（.date-chips button の全幅・左寄せを上書きする） */
+.date-chips button.dates-toggle{text-align:center;background:var(--paper);border-style:dashed;color:var(--red-dark);}
+
+/* 日時選択画面：確定ボタンを下部に固定する（他画面では section ごと hidden になる） */
+#scr-pickup{padding-bottom:110px;}
+.pickup-proceed-bar{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--paper);border-top:2px solid var(--line);box-shadow:0 -4px 18px rgba(59,42,30,.12);padding:10px 14px calc(10px + env(safe-area-inset-bottom));}
+.pickup-proceed-bar .btn{max-width:692px;margin:0 auto;}
+
+/* メニュー画面専用「↑ 上へ」ボタン（カートバーの上に重ならない位置・右下） */
+.top-btn{position:fixed;right:14px;bottom:calc(96px + env(safe-area-inset-bottom));z-index:41;border:2px solid var(--line);background:rgba(255,253,248,.95);color:var(--ink);border-radius:999px;padding:11px 16px;font-size:15px;font-weight:800;box-shadow:0 4px 14px rgba(59,42,30,.18);}
 
 /* 時刻スロット */
 .slot-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}

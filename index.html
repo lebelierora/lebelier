@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>るべりえ 注文サイト</title>
-<link rel="stylesheet" href="css/style.css?v=20251127-103">
+<link rel="stylesheet" href="css/style.css?v=20251127-104">
 </head>
 <body>
 <div class="tricolor"></div>
@@ -146,7 +146,9 @@
       <div class="slot-grid" id="slot-grid"></div>
       <p class="note" id="slot-empty" style="margin-top:8px;"></p>
     </div>
-    <button class="btn" id="pickup-proceed" disabled>時刻をお選びください</button>
+    <div class="pickup-proceed-bar">
+      <button class="btn" id="pickup-proceed" disabled>時刻をお選びください</button>
+    </div>
   </section>
 
   <!-- 商品詳細 -->
@@ -255,6 +257,9 @@
   <button id="cartbar-btn">カートを見る<span class="cart-badge hidden" id="cart-badge">0</span></button>
 </div>
 
+<!-- メニュー画面専用：上へ戻るボタン（カートバーの上に重ならない位置に出す） -->
+<button class="top-btn hidden" id="top-btn" type="button">↑ 上へ</button>
+
 <!-- 商品詳細専用の下部バー（詳細表示中はカートバーの代わりに表示） -->
 <div class="detailbar hidden" id="detailbar">
   <div class="detailbar-info">
@@ -284,6 +289,6 @@
 <div class="toast" id="toast"></div>
 
 <script src="js/qrcode.js"></script>
-<script type="module" src="js/customer.js?v=20251127-116"></script>
+<script type="module" src="js/customer.js?v=20251127-118"></script>
 </body>
 </html>

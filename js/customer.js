@@ -78,6 +78,7 @@ function show(id) {
   screens.forEach(s => $(s).classList.toggle("hidden", s !== id));
   $("cartbar").classList.toggle("hidden", id !== "scr-order");
   $("detailbar").classList.toggle("hidden", id !== "scr-detail");
+  $("top-btn").classList.toggle("hidden", id !== "scr-order" || window.scrollY < 600);
   $("dinein-bar").classList.toggle("hidden", !(id === "scr-order" && mode === "dinein"));
   window.scrollTo(0, 0);
 }
@@ -610,7 +611,8 @@ function startPickupFlow(returnTo) {
   }
   $("pickup-title").textContent = p && p.time ? "受け取り日時の変更" : "まず、受け取り日時をお選びください";
   $("pickup-cart-note").classList.toggle("hidden", cartQty() === 0);
-  renderDateChips($("date-chips"), selDate, pickDate);
+  pickupDatesExpanded = false; // 日時選択を開くたびに折りたたみから始める（選択中が範囲外ならそのチップだけ見える）
+  renderPickupDateChips();
   renderSlots();
   // 冷凍予約は焼きピザの枠（1枠1注文）を占有しないため、枠の購読はしない
   if (mode === "frozen") { unwatchSlots(); occupiedTimes = new Set(); renderSlots(); }
@@ -666,15 +668,49 @@ function dateChipList() {
   }
   return list;
 }
-function renderDateChips(el, selected, onPick) {
+function dateChipHtml(k, selected) {
   const today = todayKey();
   const tomorrow = addDays(today, 1).key;
-  el.innerHTML = dateChipList().map(k => `
+  return `
     <button data-date="${k}" class="${k === selected ? "active" : ""}" ${isClosedDay(k) ? "disabled" : ""}>
       ${formatDateJP(k)}${k === today ? `<span class="today-badge">今日</span>` : k === tomorrow ? `<span class="today-badge">明日</span>` : ""}${closedReason(k) ? `（${closedReason(k)}）` : ""}
-    </button>`).join("");
+    </button>`;
+}
+function renderDateChips(el, selected, onPick) {
+  el.innerHTML = dateChipList().map(k => dateChipHtml(k, selected)).join("");
   el.querySelectorAll("button:not(:disabled)").forEach(b =>
     b.addEventListener("click", () => onPick(b.dataset.date)));
+}
+// ---------- 日時選択画面専用：日付リストの折りたたみ ----------
+// 予約窓が長い時期（年末年始の 2027-01-03 まで等）は全日付が縦長に並んで見づらいため、
+// 日時選択画面では最初は先頭7件だけ出し、残りはボタンで開閉する。
+// 選択中の日付が先頭7件の外にある場合は、そのチップだけ畳んだ状態でも表示する。
+// 注文状況画面（status-date-chips）は renderDateChips のままで変更しない。
+const PICKUP_DATES_FIRST = 7;
+let pickupDatesExpanded = false;
+function pickupVisibleDates(list, selected) {
+  if (pickupDatesExpanded || list.length <= PICKUP_DATES_FIRST) return list.slice();
+  const head = list.slice(0, PICKUP_DATES_FIRST);
+  if (selected && list.includes(selected) && !head.includes(selected)) head.push(selected);
+  return head;
+}
+function renderPickupDateChips() {
+  const el = $("date-chips");
+  const list = dateChipList();
+  let html = pickupVisibleDates(list, selDate).map(k => dateChipHtml(k, selDate)).join("");
+  if (list.length > PICKUP_DATES_FIRST) {
+    html += pickupDatesExpanded
+      ? `<button type="button" class="dates-toggle" data-dates-toggle="close">先の日付を閉じる</button>`
+      : `<button type="button" class="dates-toggle" data-dates-toggle="open">もっと先の日付を見る（${esc(formatDateJP(list[list.length - 1]))}まで）</button>`;
+  }
+  el.innerHTML = html;
+  el.querySelectorAll("button[data-date]:not(:disabled)").forEach(b =>
+    b.addEventListener("click", () => pickDate(b.dataset.date)));
+  const tgl = el.querySelector("[data-dates-toggle]");
+  if (tgl) tgl.addEventListener("click", () => {
+    pickupDatesExpanded = tgl.dataset.datesToggle === "open";
+    renderPickupDateChips();
+  });
 }
 function renderCart() {
   if (cart.length === 0) {
@@ -805,7 +841,7 @@ function showCheckout() {
   updateSetNotes();
   validatePickupAtCheckout();
 }
-function pickDate(k) { selDate = k; selTime = null; renderDateChips($("date-chips"), selDate, pickDate); renderSlots(); if (mode !== "frozen") watchSlots(); }
+function pickDate(k) { selDate = k; selTime = null; renderPickupDateChips(); renderSlots(); if (mode !== "frozen") watchSlots(); }
 
 // ---------- 注文送信 ----------
 function makeOrderNo() {
@@ -1360,6 +1396,12 @@ $("done-home").addEventListener("click", () => {
   setMode("takeout");
   show("scr-home");
 });
+// メニュー画面で一定量スクロールしたら「↑ 上へ」を出す（他の画面では show() 側で隠す）
+window.addEventListener("scroll", () => {
+  if (currentScreen !== "scr-order") return;
+  $("top-btn").classList.toggle("hidden", window.scrollY < 600);
+}, { passive: true });
+$("top-btn").addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
 $("detailbar-add").addEventListener("click", tryAddDetailToCart);
 $("cartbar-btn").addEventListener("click", () => {
   if (cartQty() === 0) return;
