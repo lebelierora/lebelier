@@ -281,11 +281,11 @@ function startListeners() {
     renderBlocked();
   });
   setInterval(render, 30000); // カウントダウン更新
-  // 未受付がある間は繰り返し知らせる（注文＝注文の声、呼び出し＝呼び出しの声）
+  // 未受付がある間は繰り返し知らせる。両方あるときは「呼び出しの声 → 注文の声」の順でキューに入れる
   setInterval(() => {
+    if (calls.length > 0) playCallSound(calls[0].purpose, calls[0].custom); // 一番長く待っている呼び出しの用件で知らせる
     if (orders.some(o => o.status === "pending" && isVisible(o)) ||
         dineinOrders.some(o => o.status === "pending")) playSound();
-    if (calls.length > 0) playCallSound(calls[0].purpose, calls[0].custom); // 一番長く待っている呼び出しの用件で知らせる
   }, 4000);
 }
 
@@ -642,12 +642,45 @@ function renderBlocked() {
 }
 
 // ---------- 音声 ----------
-// 再生を試み、ブラウザにブロックされたら黙って失敗せず「未武装」状態に戻してバナーで知らせる
-function attemptPlay(a) {
-  try {
-    const p = a.play();
-    if (p && p.catch) p.catch(err => { console.warn("音声の再生がブロックされました", err); handlePlayRejection(); });
-  } catch (e) { handlePlayRejection(); }
+// すべての通知音は単一キューを通して直列に鳴らす（同時に1つだけ。注文の声と呼び出しの声が重ならない）。
+// 同じ audio 要素は「再生中＋待機中」で1つにまとめ、重複要求は捨てる。
+// 次へ進む条件は 'ended' イベント。来ない場合の保険として「再生時間＋3秒」のタイムアウトでも進める。
+// キュー先頭の再生がブラウザに拒否されたら、キューを空にして未武装状態に戻す（バナー表示）。
+const playQueue = [];
+let currentPlay = null; // { el, timer, finished }
+function enqueuePlay(a) {
+  if (!a) return;
+  if (currentPlay && currentPlay.el === a) return;
+  if (playQueue.includes(a)) return;
+  playQueue.push(a);
+  pumpQueue();
+}
+function pumpQueue() {
+  if (currentPlay || playQueue.length === 0) return;
+  const el = playQueue.shift();
+  const state = { el, timer: null, finished: false };
+  currentPlay = state;
+  const finish = rejected => {
+    if (state.finished) return;
+    state.finished = true;
+    el.removeEventListener("ended", onEnded);
+    if (state.timer) clearTimeout(state.timer);
+    if (currentPlay === state) currentPlay = null;
+    if (rejected) {
+      playQueue.length = 0; // 先頭が拒否されたら残りも鳴らさず、未武装化してタップ再武装を待つ
+      handlePlayRejection();
+      return;
+    }
+    pumpQueue();
+  };
+  const onEnded = () => finish(false);
+  el.addEventListener("ended", onEnded);
+  try { el.currentTime = 0; } catch (e) {}
+  let p;
+  try { p = el.play(); } catch (e) { finish(true); return; }
+  if (p && p.catch) p.catch(err => { console.warn("音声の再生がブロックされました", err); finish(true); });
+  const dur = isFinite(el.duration) && el.duration > 0 ? el.duration : 5;
+  state.timer = setTimeout(() => finish(false), (dur + 3) * 1000);
 }
 function handlePlayRejection() {
   if (!soundIntent) return;
@@ -706,9 +739,7 @@ function updateSoundUi() {
 }
 function playSound() {
   if (!soundEnabled) return;
-  const a = $("order-sound");
-  a.currentTime = 0;
-  attemptPlay(a);
+  enqueuePlay($("order-sound"));
 }
 // 呼び出しの用件ごとの音声（通常の呼び出しは従来の「お客様がお呼びです！」）
 const CALL_SOUNDS = {
@@ -728,8 +759,7 @@ function playCallSound(purpose, custom) {
   } else {
     a = $("call-sound");
   }
-  a.currentTime = 0;
-  attemptPlay(a);
+  enqueuePlay(a);
 }
 $("sound-btn").addEventListener("click", () => {
   soundIntent = true;
