@@ -8,7 +8,7 @@ import {
   todayKey, addDays, formatDateJP, isClosedDay, closedReason, timeSlots, leadMinutes,
   normalizePhone, esc, yen, SEATS, seatLabel, toMin, bookingEndKey, advanceGate,
   AGE_FESTIVAL, isAgeFestival, earlyMenuVisible,
-} from "./menu.js?v=20251127-117";
+} from "./menu.js?v=20251127-118";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
 } from "./frozen-menu.js?v=20251127-115";
@@ -439,7 +439,8 @@ function renderDetail() {
   if (hasCutPack(it) && !(mode === "dinein" && it.noCutDineIn)) selectableNames.push("カット"); // 店内でカットなし提供の注記のみの場合は除く
   if (hasCutPack(it) && mode === "takeout") selectableNames.push("包装"); // 包装はテイクアウトのみ
   // choice の見出し名は末尾の「をお選びください」を落とした短い形にする（例：「チーズの量をお選びください」→「チーズの量」）
-  if (choiceVisible && visibleOptions.length > 0) selectableNames.push(String(it.choice.label || "").replace(/をお選びください$/, ""));
+  // 実効選択肢が1つだけの choice（例：テイクアウトの烏龍茶はアイスのみで自動選択）は、選ぶものがないので案内文に入れない
+  if (choiceVisible && visibleOptions.length > 1) selectableNames.push(String(it.choice.label || "").replace(/をお選びください$/, ""));
   // トッピングの選択肢がすべて「〜抜き」だけの商品は、グループ名「トッピング」でなく実際の選択肢名で案内する
   // （例：暴れん坊帆立カレーはトッピングではなく「ハバネロ抜き」を選ぶ商品。本人の実機指摘 2026-11-27）
   const hintToppings = (it.toppings || []).filter(t => (mode === "dinein" || !t.dineInOnly) && (!t.onlyChoice || effChoice === t.onlyChoice));
@@ -516,10 +517,16 @@ function renderDetail() {
     if (detail.choice && !visibleOptions.some(o => o.label === detail.choice)) detail.choice = null;
     if (!detail.choice && visibleOptions.length === 1) detail.choice = visibleOptions[0].label; // 残り1つなら自動選択
     const choiceLabel = mode === "takeout" && it.choice.labelTakeout ? it.choice.labelTakeout : it.choice.label;
-    html += `<div class="opt-group" id="choice-group"><div class="label">${esc(choiceLabel)} ［必須］</div><div class="opt-row">` +
-      visibleOptions.map(o => `
+    if (visibleOptions.length === 1) {
+      // 選択肢が1つだけ（上で自動選択済み）のときは、必須バッジやボタンを出さず見出し文を注記として出すだけにする
+      // （例：テイクアウトの烏龍茶は「テイクアウトはアイスのみとなります」の案内のみ）
+      html += `<div class="opt-group" id="choice-group"><div class="opt-note">${esc(choiceLabel)}</div></div>`;
+    } else {
+      html += `<div class="opt-group" id="choice-group"><div class="label">${esc(choiceLabel)} ［必須］</div><div class="opt-row">` +
+        visibleOptions.map(o => `
         <button data-choice="${esc(o.label)}" class="${detail.choice === o.label ? "active" : ""}">${esc(o.label)}${o.delta ? ` <span style="color:var(--red-dark);">${o.delta > 0 ? "+" : "−"}${yen(Math.abs(o.delta))}</span>` : ""}</button>`).join("") +
-      `</div>${detail.choice ? "" : `<div class="choice-alert hidden" id="choice-alert">${esc(choiceLabel)}を選んでください</div>`}</div>`;
+        `</div>${detail.choice ? "" : `<div class="choice-alert hidden" id="choice-alert">${esc(choiceLabel)}を選んでください</div>`}</div>`;
+    }
   }
   // dineInOnly のトッピングは店内モードでのみ表示する（テイクアウトでは出さない）
   const visibleToppings = (it.toppings || []).filter(t => (mode === "dinein" || !t.dineInOnly) && (!t.onlyChoice || detail.choice === t.onlyChoice));
