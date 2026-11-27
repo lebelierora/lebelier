@@ -48,7 +48,13 @@ let calls = [];         // calls（status=open のもの）
 let blocked = [];       // blockedPhones
 let adj = {};           // docId -> 確定予定時刻の調整オフセット（分）
 let tabFilter = "all";  // "all" | "dinein" | "takeout"
-let soundEnabled = false;
+// 音声：iOS Safari の再生ロック解除はページ読み込みごとにリセットされる（PassPRNT印刷の戻りで
+// 再読み込みされるたびに無効化される）。そのため「有効にしたい意思」は localStorage に残し、
+// 読み込み直後は未武装（soundEnabled=false）として、最初のタップで再武装する。
+const SOUND_FLAG_KEY = "kitchenSoundEnabled";
+let soundIntent = false; // 音を有効にしたい意思（永続化）
+try { soundIntent = localStorage.getItem(SOUND_FLAG_KEY) === "1"; } catch (e) {}
+let soundEnabled = false; // この読み込みで実際に鳴らせる状態（武装済み）か
 let knownPending = new Set();
 let knownDineinPending = new Set();
 let knownCalls = new Set();
@@ -212,6 +218,8 @@ function openKitchen() {
   kitchenOpen = true;
   $("pin-gate").classList.add("hidden");
   $("kitchen-main").classList.remove("hidden");
+  updateSoundUi();
+  ensureRearm();
   startListeners();
   handlePrintReturn();
 }
@@ -634,11 +642,73 @@ function renderBlocked() {
 }
 
 // ---------- 音声 ----------
+// 再生を試み、ブラウザにブロックされたら黙って失敗せず「未武装」状態に戻してバナーで知らせる
+function attemptPlay(a) {
+  try {
+    const p = a.play();
+    if (p && p.catch) p.catch(err => { console.warn("音声の再生がブロックされました", err); handlePlayRejection(); });
+  } catch (e) { handlePlayRejection(); }
+}
+function handlePlayRejection() {
+  if (!soundIntent) return;
+  soundEnabled = false; // この読み込みでは鳴らせない状態に戻す
+  updateSoundUi();
+  ensureRearm();
+}
+// ユーザージェスチャの中で audio 要素を一度再生→停止し、この読み込みでの再生ロックを解除する
+function primeAudioEl(a) {
+  if (!a) return;
+  try {
+    const p = a.play();
+    if (p && p.catch) p.catch(() => {});
+    a.pause();
+    a.currentTime = 0;
+  } catch (e) {}
+}
+// タップをきっかけに音声を再武装する。未対応の注文・呼び出しがあれば、その場で一度知らせる。
+function armSound() {
+  if (!soundIntent || soundEnabled) return;
+  soundEnabled = true;
+  primeAudioEl($("order-sound"));
+  primeAudioEl($("call-sound"));
+  for (const k of Object.keys(callAudioCache)) primeAudioEl(callAudioCache[k]);
+  updateSoundUi();
+  if (orders.some(o => o.status === "pending" && isVisible(o)) ||
+      dineinOrders.some(o => o.status === "pending")) playSound();
+  else if (calls.length > 0) playCallSound(calls[0].purpose, calls[0].custom);
+}
+let rearmListening = false;
+function ensureRearm() {
+  if (!soundIntent || soundEnabled || rearmListening) return;
+  rearmListening = true;
+  document.addEventListener("pointerdown", onRearmTap);
+}
+function onRearmTap() {
+  document.removeEventListener("pointerdown", onRearmTap);
+  rearmListening = false;
+  armSound();
+}
+function updateSoundUi() {
+  const banner = $("sound-banner");
+  const state = $("sound-state");
+  if (!state) return;
+  if (soundIntent && !soundEnabled) {
+    if (banner) banner.classList.remove("hidden");
+    state.textContent = "音声：有効（画面をタップすると音が出るようになります）";
+  } else if (soundEnabled) {
+    if (banner) banner.classList.add("hidden");
+    state.textContent = "音声：有効（新しい注文・呼び出しでモコの声が鳴ります）";
+  } else {
+    if (banner) banner.classList.add("hidden");
+    state.textContent = "音声：未設定（ボタンを押すと鳴るようになります）";
+  }
+  $("sound-btn").textContent = soundIntent ? "音をテストする" : "音を有効にする";
+}
 function playSound() {
   if (!soundEnabled) return;
   const a = $("order-sound");
   a.currentTime = 0;
-  a.play().catch(() => {});
+  attemptPlay(a);
 }
 // 呼び出しの用件ごとの音声（通常の呼び出しは従来の「お客様がお呼びです！」）
 const CALL_SOUNDS = {
@@ -659,11 +729,16 @@ function playCallSound(purpose, custom) {
     a = $("call-sound");
   }
   a.currentTime = 0;
-  a.play().catch(() => {});
+  attemptPlay(a);
 }
 $("sound-btn").addEventListener("click", () => {
+  soundIntent = true;
+  try { localStorage.setItem(SOUND_FLAG_KEY, "1"); } catch (e) {}
   soundEnabled = true;
-  $("sound-state").textContent = "音声：有効（新しい注文・呼び出しでモコの声が鳴ります）";
-  $("sound-btn").textContent = "音をテストする";
+  primeAudioEl($("call-sound"));
+  for (const k of Object.keys(callAudioCache)) primeAudioEl(callAudioCache[k]);
+  updateSoundUi();
   playSound();
 });
+updateSoundUi();
+ensureRearm();
