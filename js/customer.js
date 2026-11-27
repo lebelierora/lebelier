@@ -467,7 +467,7 @@ function renderDetail() {
       <div class="label">包装</div>
       <div class="opt-row">
         <button id="pack-paper" class="${detail.pack === "paper" ? "active" : ""}">紙皿・ホイル（無料）</button>
-        <button id="pack-box" class="${detail.pack === "box" ? "active" : ""}" ${boxDisabled ? "disabled" : ""}>箱（+100円）</button>
+        <button id="pack-box" class="${detail.pack === "box" ? "active" : ""}" ${boxDisabled ? "disabled" : ""}>箱入り・カットなし（+100円）</button>
       </div>
       ${it.noBox ? `<div class="opt-note">バターがこぼれやすいため、箱での提供はしていません</div>`
                  : boxDisabledByCut ? `<div class="opt-note">箱はカットなしのお渡しです</div>` : ""}
@@ -722,7 +722,7 @@ function renderCart() {
       const it = anyById(c.itemId);
       const custom = [
         c.cut ? (c.cut === "cut4" ? "4カット" : c.cut === "cut6" ? "6カット" : "未カット") : null,
-        c.pack ? (c.pack === "box" ? "箱（+100円）" : "紙皿・ホイル") : null,
+        c.pack ? (c.pack === "box" ? "箱入り・カットなし（+100円）" : "紙皿・ホイル") : null,
         c.choice || null,
         ...(c.toppings || []),
       ].filter(Boolean).join("／");
@@ -1096,6 +1096,20 @@ function showDone(docId, orderNo) {
 let statusDate = todayKey();
 let statusUnsubs = [];
 let statusData = {};
+// 注文状況の初期表示日：この端末に今日以降の注文があれば、その最も近い受け取り日を開く。
+// （送信直後にトップから開くと今日が開いて「見つかりません」と出て、送信できていないように見えるため）
+// 日付チップ一覧に含まれる日だけを採用し、範囲外・注文なしの場合は従来どおり今日。
+function initialStatusDate() {
+  const today = todayKey();
+  let mine = [];
+  try { mine = JSON.parse(localStorage.getItem("ruberie_my_orders") || "[]"); } catch (e) { mine = []; }
+  const upcoming = mine
+    .map(m => m.pickupDate || m.requestedDate)
+    .filter(d => d && d >= today)
+    .sort();
+  if (upcoming.length === 0) return today;
+  return dateChipList().includes(upcoming[0]) ? upcoming[0] : today;
+}
 function pickStatusDate(k) { statusDate = k; renderDateChips($("status-date-chips"), statusDate, pickStatusDate); searchStatus(); }
 function searchStatus() {
   statusUnsubs.forEach(u => u()); statusUnsubs = []; statusData = {};
@@ -1388,7 +1402,7 @@ $("done-more").addEventListener("click", () => {
   enterDineinMenu();
 });
 $("go-status").addEventListener("click", () => {
-  statusDate = todayKey();
+  statusDate = initialStatusDate();
   renderDateChips($("status-date-chips"), statusDate, pickStatusDate);
   searchStatus();
   show("scr-status");
