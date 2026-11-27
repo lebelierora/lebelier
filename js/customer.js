@@ -187,12 +187,13 @@ function timingOptions(it) {
 let detail = null; // {item, cut, pack, choice, toppings:Set, qty, timing}
 function openDetail(id) {
   const item = anyById(id);
-  detail = { item, cut: null, pack: "paper",
+  detail = { item, cut: null, pack: null,
              choice: null, // choice は未選択スタート。選ぶまでカートに入れられない
              toppings: new Set(), qty: 1, descOpen: false,
              timing: null }; // 提供タイミングも未選択スタート。タイミングがある商品は選ぶまでカートに入れられない
              // カットも未選択スタート（2026-11-27 本人決定）。カット選択が出る商品は選ぶまでカートに入れられない。
              // ただし店内でカットなし固定の商品（noCutDineIn）は選択肢がないので対象外（renderDetail で nocut に固定される）
+             // 包装も未選択スタート（2026-11-27 本人決定で追加）。包装選択が出る商品（テイクアウトのみ）は選ぶまでカートに入れられない
   renderDetail();
   show("scr-detail");
 }
@@ -284,6 +285,26 @@ function guideToRequiredCut() {
     if (alert) alert.classList.add("hidden");
   }, 2400);
 }
+function detailPackMissing() {
+  if (!detail) return false;
+  // 包装選択が出るのはテイクアウトでカット/包装対象の商品だけ。その場合のみ必須
+  return mode === "takeout" && hasCutPack(detail.item) && !detail.pack;
+}
+let packGuideTimer = null;
+function guideToRequiredPack() {
+  const group = $("pack-group");
+  if (!group) return;
+  group.scrollIntoView({ behavior: "smooth", block: "center" });
+  group.classList.add("attention");
+  const alert = $("pack-alert");
+  if (alert) alert.classList.remove("hidden");
+  toast("包装をお選びください", 1800);
+  clearTimeout(packGuideTimer);
+  packGuideTimer = setTimeout(() => {
+    group.classList.remove("attention");
+    if (alert) alert.classList.add("hidden");
+  }, 2400);
+}
 function detailTimingMissing() {
   if (!detail) return false;
   return !!timingOptions(detail.item) && !detail.timing;
@@ -306,6 +327,7 @@ function guideToRequiredTiming() {
 function tryAddDetailToCart() {
   if (!detail) return;
   if (detailCutMissing()) { guideToRequiredCut(); return; }
+  if (detailPackMissing()) { guideToRequiredPack(); return; }
   if (detailChoiceMissing()) { guideToRequiredChoice(); return; }
   if (detailTimingMissing()) { guideToRequiredTiming(); return; }
   const it = detail.item;
@@ -368,7 +390,7 @@ function renderDetail() {
     // 包装（箱）はテイクアウトのみ。店内では出さない
     if (mode === "takeout") {
       html += `
-    <div class="opt-group">
+    <div class="opt-group" id="pack-group">
       <div class="label">包装</div>
       <div class="opt-row">
         <button id="pack-paper" class="${detail.pack === "paper" ? "active" : ""}">紙皿・ホイル（無料）</button>
@@ -376,6 +398,7 @@ function renderDetail() {
       </div>
       ${it.noBox ? `<div class="opt-note">バターがこぼれやすいため、箱での提供はしていません</div>`
                  : boxDisabledByCut ? `<div class="opt-note">箱はカットなしのお渡しです</div>` : ""}
+      ${detail.pack ? "" : `<div class="opt-note">お選びください（必須）</div><div class="choice-alert hidden" id="pack-alert">包装をお選びください</div>`}
     </div>`;
     }
   }
