@@ -170,8 +170,9 @@ function effDesc(it) { return (mode === "dinein" && it.descDineIn !== undefined)
 
 // ---------- 商品詳細 ----------
 // ---------- 提供タイミング（店内のみ） ----------
-// ドリンク: すぐ提供／最初の商品と一緒／食後、スイーツ系: でき次第／最後。先頭が既定（選ばなくても注文できる）
-// ※スイーツ系の既定は旧文言「できた順」から「でき次第」に変更（2026-11-27）。旧文言で保存された注文は表示側で読み替える
+// ドリンク: すぐ提供／最初の商品と一緒／食後、スイーツ系: でき次第／最後。
+// 2026-11-27 本人決定: 既定の事前選択はやめ、未選択スタートの必須選択にした（見ないお客様が意図しないタイミングで出てくる事故防止）。
+// ※スイーツ系の文言は旧「できた順」から「でき次第」に変更済み（2026-11-27）。旧文言で保存された注文は表示側で読み替える
 const TIMING_DRINK = ["すぐ提供", "最初の商品と一緒", "食後"];
 const TIMING_SWEET = ["でき次第", "最後"];
 function timingOptions(it) {
@@ -186,11 +187,10 @@ function timingOptions(it) {
 let detail = null; // {item, cut, pack, choice, toppings:Set, qty, timing}
 function openDetail(id) {
   const item = anyById(id);
-  const topts = timingOptions(item);
   detail = { item, cut: "nocut", pack: "paper",
              choice: null, // choice は未選択スタート。選ぶまでカートに入れられない
              toppings: new Set(), qty: 1, descOpen: false,
-             timing: topts ? topts[0] : null };
+             timing: null }; // 提供タイミングも未選択スタート。タイミングがある商品は選ぶまでカートに入れられない
   renderDetail();
   show("scr-detail");
 }
@@ -262,9 +262,29 @@ function guideToRequiredChoice() {
     if (alert) alert.classList.add("hidden");
   }, 2400);
 }
+function detailTimingMissing() {
+  if (!detail) return false;
+  return !!timingOptions(detail.item) && !detail.timing;
+}
+let timingGuideTimer = null;
+function guideToRequiredTiming() {
+  const group = $("timing-group");
+  if (!group) return;
+  group.scrollIntoView({ behavior: "smooth", block: "center" });
+  group.classList.add("attention");
+  const alert = $("timing-alert");
+  if (alert) alert.classList.remove("hidden");
+  toast("提供のタイミングをお選びください", 1800);
+  clearTimeout(timingGuideTimer);
+  timingGuideTimer = setTimeout(() => {
+    group.classList.remove("attention");
+    if (alert) alert.classList.add("hidden");
+  }, 2400);
+}
 function tryAddDetailToCart() {
   if (!detail) return;
   if (detailChoiceMissing()) { guideToRequiredChoice(); return; }
+  if (detailTimingMissing()) { guideToRequiredTiming(); return; }
   const it = detail.item;
   cart.push({ itemId: it.id, qty: detail.qty, cut: hasCutPack(it) ? detail.cut : null,
               pack: hasCutPack(it) && mode === "takeout" ? detail.pack : null,
@@ -362,9 +382,9 @@ function renderDetail() {
   }
   const topts = timingOptions(it);
   if (topts) {
-    html += `<div class="opt-group"><div class="label">提供タイミング</div><div class="opt-row">` +
+    html += `<div class="opt-group" id="timing-group"><div class="label">提供のタイミング</div><div class="opt-row">` +
       topts.map(t => `<button data-timing="${esc(t)}" class="${detail.timing === t ? "active" : ""}">${esc(t)}</button>`).join("") +
-      `</div></div>`;
+      `</div>${detail.timing ? "" : `<div class="opt-note">お選びください（必須）</div><div class="choice-alert hidden" id="timing-alert">提供のタイミングをお選びください</div>`}</div>`;
   }
   html += `
     <div class="opt-group">
