@@ -238,6 +238,12 @@
     <h3 style="margin:0 0 4px;">店員を呼ぶ</h3>
     <p class="note" style="margin:0;">ご用件をお選びください</p>
     <div id="call-purposes"></div>
+    <div id="call-custom" class="hidden">
+      <div class="field" style="margin-top:10px;">
+        <input type="text" id="call-custom-input" maxlength="50" placeholder="例：子供用の椅子をください">
+      </div>
+      <button class="btn" id="call-custom-send" style="margin-top:10px;" disabled>この内容で呼ぶ</button>
+    </div>
     <button class="btn" id="call-cancel" style="margin-top:14px;">キャンセル</button>
   </div>
 </div>
@@ -246,6 +252,6 @@
 <div class="toast" id="toast"></div>
 
 <script src="js/qrcode.js"></script>
-<script type="module" src="js/customer.js?v=20251127-99"></script>
+<script type="module" src="js/customer.js?v=20251127-100"></script>
 </body>
 </html>

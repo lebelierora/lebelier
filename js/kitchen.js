@@ -262,7 +262,7 @@ function startListeners() {
       .sort((a, b) => tsMillis(a.createdAt) - tsMillis(b.createdAt));
     const ids = new Set(calls.map(c => c.id));
     if (startedCalls) {
-      for (const c of calls) if (!knownCalls.has(c.id)) playCallSound(c.purpose);
+      for (const c of calls) if (!knownCalls.has(c.id)) playCallSound(c.purpose, c.custom);
     }
     knownCalls = ids;
     startedCalls = true;
@@ -277,7 +277,7 @@ function startListeners() {
   setInterval(() => {
     if (orders.some(o => o.status === "pending" && isVisible(o)) ||
         dineinOrders.some(o => o.status === "pending")) playSound();
-    if (calls.length > 0) playCallSound(calls[0].purpose); // 一番長く待っている呼び出しの用件で知らせる
+    if (calls.length > 0) playCallSound(calls[0].purpose, calls[0].custom); // 一番長く待っている呼び出しの用件で知らせる
   }, 4000);
 }
 
@@ -454,7 +454,9 @@ function renderCalls() {
   area.innerHTML = `<h2 style="margin:4px 0 10px;">🔔 呼び出し ${calls.length}件</h2>` +
     calls.map(c => `<div class="call-card">
       <div class="call-seat">${esc(c.seatLabel || seatLabel(c.seat))}</div>
-      <div style="font-weight:800;">${c.purpose && c.purpose !== "通常の呼び出し" ? esc(c.purpose) : "店員を呼んでいます"}</div>
+      <div style="font-weight:800;">${c.custom
+        ? `<span class="kind-chip">ご要望</span> ${esc(c.purpose || "")}`
+        : (c.purpose && c.purpose !== "通常の呼び出し" ? esc(c.purpose) : "店員を呼んでいます")}</div>
       <div class="act-row">
         <button class="btn" data-call-done="${c.id}">対応した</button>
       </div>
@@ -646,10 +648,11 @@ const CALL_SOUNDS = {
   "お会計をお願いします": "audio/moko-call-bill-v1.mp3",
 };
 const callAudioCache = {};
-function playCallSound(purpose) {
+function playCallSound(purpose, custom) {
   if (!soundEnabled) return;
   let a;
-  if (purpose && CALL_SOUNDS[purpose]) {
+  // 自由記入の呼び出し（custom）は用件別音声を使わず、通常の呼び出し音にする
+  if (!custom && purpose && CALL_SOUNDS[purpose]) {
     if (!callAudioCache[purpose]) { callAudioCache[purpose] = new Audio(CALL_SOUNDS[purpose]); callAudioCache[purpose].preload = "auto"; }
     a = callAudioCache[purpose];
   } else {

@@ -869,12 +869,21 @@ function openCallModal(msgEl) {
   if (!seat) { msgEl.textContent = "先にお席をお選びください。"; return; }
   pendingCallMsg = msgEl;
   $("call-purposes").innerHTML = CALL_PURPOSES.map(p =>
-    `<button class="btn ghost" data-purpose="${esc(p)}" style="margin-top:8px;">${esc(p)}</button>`).join("");
+    `<button class="btn ghost" data-purpose="${esc(p)}" style="margin-top:8px;">${esc(p)}</button>`).join("") +
+    `<button class="btn ghost" data-custom="1" style="margin-top:8px;">その他のご要望</button>`;
   $("call-purposes").querySelectorAll("[data-purpose]").forEach(b =>
     b.addEventListener("click", () => { $("call-modal").classList.add("hidden"); callStaff(pendingCallMsg, b.dataset.purpose); }));
+  $("call-purposes").querySelector("[data-custom]").addEventListener("click", () => {
+    $("call-custom").classList.remove("hidden");
+    $("call-custom-input").focus();
+  });
+  // 自由記入欄はモーダルを開くたびにリセットする
+  $("call-custom").classList.add("hidden");
+  $("call-custom-input").value = "";
+  $("call-custom-send").disabled = true;
   $("call-modal").classList.remove("hidden");
 }
-async function callStaff(msgEl, purpose) {
+async function callStaff(msgEl, purpose, custom) {
   if (!seat) { msgEl.textContent = "先にお席をお選びください。"; return; }
   if (callBusy) return;
   callBusy = true;
@@ -882,6 +891,7 @@ async function callStaff(msgEl, purpose) {
     await addDoc(collection(db, "calls"), {
       seat, seatLabel: seatLabel(seat), status: "open",
       purpose: purpose || "通常の呼び出し",
+      ...(custom ? { custom: true } : {}),
       createdAt: serverTimestamp(),
     });
     msgEl.textContent = "店員をお呼びしました。お席まで伺います。";
@@ -928,6 +938,18 @@ $("to-takeout").addEventListener("click", e => {
 });
 $("call-btn-checkout").addEventListener("click", () => openCallModal($("call-msg-checkout")));
 $("call-btn-done").addEventListener("click", () => openCallModal($("call-msg-done")));
+$("call-custom-input").addEventListener("input", () => {
+  $("call-custom-send").disabled = $("call-custom-input").value.trim().length === 0;
+});
+$("call-custom-send").addEventListener("click", () => {
+  const text = $("call-custom-input").value.trim().slice(0, 50);
+  if (!text || !pendingCallMsg) return;
+  $("call-modal").classList.add("hidden");
+  $("call-custom").classList.add("hidden");
+  $("call-custom-input").value = "";
+  $("call-custom-send").disabled = true;
+  callStaff(pendingCallMsg, text, true);
+});
 $("call-cancel").addEventListener("click", () => $("call-modal").classList.add("hidden"));
 $("call-modal").addEventListener("click", e => { if (e.target === $("call-modal")) $("call-modal").classList.add("hidden"); });
 $("done-more").addEventListener("click", () => {
