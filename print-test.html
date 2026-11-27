@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>プリンター印刷テスト｜るべりえ</title>
+<style>
+* { box-sizing: border-box;}
+body { font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; margin: 0; padding: 16px; background: #f7f4ef; color: #222; font-size: 17px; line-height: 1.6;}
+h1 { font-size: 24px; margin: 8px 0 4px;}
+h2 { font-size: 19px; margin: 24px 0 8px;}
+.card { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 16px; margin: 12px 0;}
+label { font-weight: bold; display: block; margin-bottom: 6px;}
+input[type="text"] { width: 100%; font-size: 22px; padding: 12px; border: 2px solid #888; border-radius: 8px;}
+button { display: block; width: 100%; min-height: 64px; font-size: 20px; font-weight: bold; border: none; border-radius: 12px; padding: 14px 12px; margin: 12px 0; cursor: pointer; color: #fff;}
+button:disabled { opacity: 0.5;}
+.btn-http { background: #1a7f37;}
+.btn-https { background: #0969da;}
+.btn-status { background: #6e5a00;}
+.btn-passprnt { background: #555;}
+.small { font-size: 14px; color: #555;}
+#result { white-space: pre-wrap; word-break: break-all; background: #111; color: #e6e6e6; border-radius: 8px; padding: 12px; font-size: 14px; min-height: 60px;}
+#log { white-space: pre-wrap; word-break: break-all; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; font-size: 14px;}
+.ok { color: #1a7f37; font-weight: bold;}
+.ng { color: #c0392b; font-weight: bold;}
+#latest { font-size: 19px; margin: 8px 0;}
+</style>
+</head>
+<body>
+<h1>プリンター印刷テスト</h1>
+<p>自作モバイルオーダーの注文伝票を、店のプリンター（スター精密 mC-Print3／紙幅80mm）に出せるかを確認するための<strong>テスト専用ページ</strong>です。本物の注文は出ません。</p>
+
+<div class="card">
+<label for="printerIp">プリンターのIPアドレス</label>
+<input type="text" id="printerIp" inputmode="decimal" autocomplete="off" value="192.168.11.40">
+<p class="small">※ 変えた場合は自動でこの端末に記憶されます。通常は 192.168.11.40 のままで大丈夫です。</p>
+</div>
+
+<div class="card">
+<h2>テスト印刷</h2>
+<button class="btn-http" id="btnHttp">① WebPRNTでテスト印刷（http）</button>
+<button class="btn-https" id="btnHttps">② WebPRNTでテスト印刷（https）</button>
+<button class="btn-status" id="btnStatus">③ プリンターの状態だけ確認</button>
+<button class="btn-passprnt" id="btnPassprnt">④ PassPRNTアプリで印刷（試験用）</button>
+<p class="small">④は、iPadに「PassPRNT」アプリが入っている場合だけ動く予備の方法です（試験用）。</p>
+</div>
+
+<div class="card">
+<h2>結果</h2>
+<p id="latest">まだ試していません。</p>
+<div id="result">ここに詳しい結果（エラー文など）がそのまま出ます。報告のときにコピーして使えます。</div>
+<button id="btnCopy" style="background:#333; min-height:52px; font-size:17px;">結果をコピーする</button>
+<h2>試した記録</h2>
+<div id="log">（まだ記録はありません）</div>
+</div>
+
+<div class="card">
+<h2>テストの前に（大切）</h2>
+<p>・このテストは<strong>お店のWi-Fiにつないだ状態</strong>でやってください（自宅や外出先からはプリンターに届きません）。<br>
+・プリンターの電源が入っていて、紙が入っていることを確認してください。</p>
+<h2>結果の報告のお願い</h2>
+<p>紙が出たかどうかと、上の「結果」に出た文をそのまま教えてください。特に次のような場合は、その文が原因を特定する手がかりになります。</p>
+<p>・「Failed to fetch」や応答なし（status 0）と出たら、この https のページからプリンターの http へ送る通信がブラウザに止められている可能性が高いです（想定内の失敗です）。<br>
+・②の https で証明書の警告が出たら、その画面の文を教えてください。<br>
+・「カバーが開いています」「紙がありません」などと出たら、プリンター側の状態の問題です。</p>
+</div>
+
+<script src="js/star-webprint-builder.js"></script>
+<script src="js/star-webprint-trader.js"></script>
+<script>
+(function () {
+var IP_KEY = 'printTestPrinterIp';
+var ipInput = document.getElementById('printerIp');
+var latestEl = document.getElementById('latest');
+var resultEl = document.getElementById('result');
+var logEl = document.getElementById('log');
+var logLines = [];
+
+try {
+var saved = localStorage.getItem(IP_KEY);
+if (saved) ipInput.value = saved;
+} catch (e) {}
+ipInput.addEventListener('change', function () {
+try { localStorage.setItem(IP_KEY, ipInput.value.trim());} catch (e) {}
+});
+
+function nowStr() {
+var d = new Date();
+function p(n) { return (n < 10? '0': '') + n;}
+return d.getFullYear() + '/' + p(d.getMonth() + 1) + '/' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+}
+
+function getIp() {
+var ip = ipInput.value.trim();
+try { localStorage.setItem(IP_KEY, ip);} catch (e) {}
+return ip;
+}
+
+function showResult(title, ok, detail) {
+latestEl.innerHTML = (ok? '<span class="ok">✅ ': '<span class="ng">❌ ') + title + '</span>';
+resultEl.textContent = detail;
+logLines.unshift('' + title + '\n' + detail);
+logEl.textContent = logLines.join('\n\n');
+}
+
+function hintFor(text) {
+var hints = [];
+if (/Failed to fetch|status: 0|NetworkError|Load failed/i.test(text)) {
+hints.push('ヒント: 「Failed to fetch」等は、httpsのページからプリンターのhttpへ送る通信がブラウザに止められた可能性が高いです（想定内の失敗パターンです）。');
+}
+if (/certificate|SSL|trust|証明書/i.test(text)) {
+hints.push('ヒント: 証明書が信頼されていない可能性が高いです。');
+}
+if (/timeout|時間内/i.test(text)) {
+hints.push('ヒント: 時間内に応答がありませんでした。お店のWi-Fiにつながっているか、IPアドレスが合っているか確認してください。');
+}
+return hints.length? '\n' + hints.join('\n'): '';
+}
+
+function buildTicketRequest() {
+var builder = new StarWebPrintBuilder();
+var req = '';
+req += builder.createInitializationElement({ reset: 'true'});
+req += builder.createAlignmentElement({ position: 'center'});
+req += builder.createTextElement({ data: 'るべりえ\n', emphasis: 'true', width: 2, height: 2, codepage: 'utf8'});
+req += builder.createTextElement({ data: '\n', emphasis: 'true', width: 2, height: 2, codepage: 'utf8'});
+req += builder.createTextElement({ data: '新規注文・未受付\n', emphasis: 'true', width: 2, height: 2, codepage: 'utf8'});
+req += builder.createAlignmentElement({ position: 'left'});
+req += builder.createTextElement({ data: '--------------------------------\n', codepage: 'utf8'});
+req += builder.createTextElement({ data: '受け取り 12:30\n', emphasis: 'true', codepage: 'utf8'});
+req += builder.createTextElement({ data: 'テスト注文 太郎 様\n', codepage: 'utf8'});
+req += builder.createTextElement({ data: 'マルゲリータ ×1\n', codepage: 'utf8'});
+req += builder.createTextElement({ data: '揚げピザ（白菜）×2\n', codepage: 'utf8'});
+req += builder.createTextElement({ data: '--------------------------------\n', codepage: 'utf8'});
+req += builder.createTextElement({ data: '合計 ¥2,160\n', emphasis: 'true', codepage: 'utf8'});
+req += builder.createTextElement({ data: '※これはテスト印刷です。\n実際の注文ではありません。\n', codepage: 'utf8'});
+req += builder.createFeedElement({ line: 3});
+req += builder.createCutPaperElement({ feed: 'true', type: 'partial'});
+return req;
+}
+
+function describeStatus(trader, res) {
+var parts = [];
+try {
+if (trader.isCoverOpen(res)) parts.push('カバーが開いています');
+if (trader.isOffLine(res)) parts.push('オフライン（印刷できない状態）です');
+if (trader.isPaperEnd(res)) parts.push('紙がありません');
+if (trader.isPaperNearEnd(res)) parts.push('紙が残りわずかです');
+if (trader.isPaperPresent(res)) parts.push('紙は入っています');
+if (trader.isAutoCutterError(res)) parts.push('カッターエラーです');
+if (trader.isNonRecoverableError(res)) parts.push('復帰できないエラーです');
+if (trader.isHighTemperatureStop(res)) parts.push('高温で停止しています');
+} catch (e) {}
+return parts;
+}
+
+// scheme: 'http' | 'https', mode: 'print' | 'status'
+function sendWebPrnt(scheme, mode, btn) {
+var ip = getIp();
+if (!ip) { showResult('IPアドレスが空です', false, 'プリンターのIPアドレスを入力してください。'); return;}
+var url = scheme + '://' + ip + '/StarWebPRNT/SendMessage/';
+var label = (mode === 'status'? '状態確認': 'テスト印刷') + '（' + scheme + '）';
+btn.disabled = true;
+latestEl.textContent = '送信中…（最大20秒ほど待ちます）';
+resultEl.textContent = label + ' を送信しています。送り先: ' + url;
+
+var request;
+try {
+if (mode === 'status') {
+var b = new StarWebPrintBuilder();
+request = b.createInitializationElement({ reset: 'true'});
+} else {
+request = buildTicketRequest();
+}
+} catch (e) {
+btn.disabled = false;
+showResult(label + ' 失敗（伝票データ作成エラー）', false, 'エラー: ' + (e && e.message? e.message: e));
+return;
+}
+
+var trader = new StarWebPrintTrader({ url: url, timeout: 20000});
+var settled = false;
+var watchdog = setTimeout(function () {
+if (settled) return;
+settled = true;
+btn.disabled = false;
+var detail = label + '\n送り先: ' + url + '\n結果: 25秒たっても応答がありませんでした（タイムアウト）。' + hintFor('timeout');
+showResult(label + ' 応答なし', false, detail);
+}, 25000);
+
+trader.onReceive = function (res) {
+if (settled) return;
+settled = true;
+clearTimeout(watchdog);
+btn.disabled = false;
+var statusDesc = describeStatus(trader, res);
+var success = (res.traderSuccess === 'true');
+var detail = label + '\n送り先: ' + url +
+'\ntraderSuccess: ' + res.traderSuccess +
+'\ntraderCode: ' + res.traderCode +
+'\ntraderStatus: ' + res.traderStatus +
+'\nHTTP status: ' + res.status +
+(statusDesc.length? '\nプリンターの状態: ' + statusDesc.join(' / '): '') +
+'\n応答そのまま:\n' + res.responseText;
+if (mode === 'status') {
+showResult('状態確認 ' + (statusDesc.length? '：' + statusDesc.join(' / '): '：応答あり'), true, detail);
+} else {
+showResult(success? 'テスト印刷 成功（プリンターが受け付けました）': 'テスト印刷 失敗（プリンターがエラーを返しました）', success, detail + (success? '': hintFor(detail)));
+}
+};
+trader.onError = function (res) {
+if (settled) return;
+settled = true;
+clearTimeout(watchdog);
+btn.disabled = false;
+var detail = label + '\n送り先: ' + url +
+'\n結果: エラー\nstatus: ' + (res && res.status!== undefined? res.status: '(なし)') +
+'\n応答そのまま:\n' + (res && res.responseText? res.responseText: '(なし)');
+showResult(label + ' エラー', false, detail + hintFor(detail));
+};
+trader.onTimeout = function () {
+if (settled) return;
+settled = true;
+clearTimeout(watchdog);
+btn.disabled = false;
+var detail = label + '\n送り先: ' + url + '\n結果: プリンターから時間内に応答がありませんでした（trader timeout）。' + hintFor('timeout');
+showResult(label + ' タイムアウト', false, detail);
+};
+
+try {
+trader.sendMessage({ request: request});
+} catch (e) {
+if (settled) return;
+settled = true;
+clearTimeout(watchdog);
+btn.disabled = false;
+var detail2 = label + '\n送り先: ' + url + '\n結果: 送信時に例外が発生しました\nエラー: ' + (e && e.message? e.message: e);
+showResult(label + ' 例外エラー', false, detail2 + hintFor(detail2));
+}
+}
+
+function printViaPassPrnt() {
+var ip = getIp();
+var html = '<html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;">' +
+'<div style="text-align:center;font-size:28px;font-weight:bold;">るべりえ</div>' +
+'<div style="text-align:center;font-size:28px;font-weight:bold;"></div>' +
+'<div style="text-align:center;font-size:28px;font-weight:bold;">新規注文・未受付</div>' +
+'<hr>' +
+'<div style="font-size:22px;font-weight:bold;">受け取り 12:30</div>' +
+'<div style="font-size:22px;">テスト注文 太郎 様</div>' +
+'<div style="font-size:22px;">マルゲリータ ×1</div>' +
+'<div style="font-size:22px;">揚げピザ（白菜）×2</div>' +
+'<hr>' +
+'<div style="font-size:22px;font-weight:bold;">合計 ¥2,160</div>' +
+'<div style="font-size:20px;">※これはテスト印刷です。実際の注文ではありません。</div>' +
+'</body></html>';
+// Star PassPRNT 公式マニュアル (iOS版 Data Specifications) の形式:
+// starpassprnt://v1/print/nopreview?back=<戻り先>&html=<HTML>&size=576&port=TCP:<IP>
+// size=576 は mC-Print3 の80mm幅 (576ドット)。port は PassPRNT のプリンター設定があれば省略可だが、明示する。
+var uri = 'starpassprnt://v1/print/nopreview?' +
+'back=' + encodeURIComponent(window.location.href) +
+'&html=' + encodeURIComponent(html) +
+'&size=576' +
+(ip? '&port=' + encodeURIComponent('TCP:' + ip): '');
+var detail = 'PassPRNT（試験用）\n送り先URLスキーム: starpassprnt://v1/print/nopreview\nプリンター指定: ' + (ip? 'TCP:' + ip: '(PassPRNT側の設定)') + '\nPassPRNTアプリへ切り替わります。印刷できたか、紙が出たか教えてください。アプリが入っていない場合は何も起きません。';
+showResult('PassPRNTを呼び出しました', true, detail);
+window.location.href = uri;
+}
+
+document.getElementById('btnHttp').addEventListener('click', function () { sendWebPrnt('http', 'print', this);});
+document.getElementById('btnHttps').addEventListener('click', function () { sendWebPrnt('https', 'print', this);});
+document.getElementById('btnStatus').addEventListener('click', function () { sendWebPrnt('http', 'status', this);});
+document.getElementById('btnPassprnt').addEventListener('click', function () { printViaPassPrnt();});
+document.getElementById('btnCopy').addEventListener('click', function () {
+var text = resultEl.textContent;
+if (navigator.clipboard && navigator.clipboard.writeText) {
+navigator.clipboard.writeText(text).then(function () { latestEl.textContent = '結果をコピーしました。';}, function () { latestEl.textContent = 'コピーできませんでした。結果の文を長押しで選んでコピーしてください。';});
+} else {
+latestEl.textContent = 'この端末では自動コピーできません。結果の文を長押しで選んでコピーしてください。';
+}
+});
+})();
+</script>
+</body>
+</html>
