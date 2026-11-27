@@ -5,9 +5,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
-  todayKey, addDays, formatDateJP, isThursday, timeSlots, leadMinutes,
+  todayKey, addDays, formatDateJP, isClosedDay, closedReason, timeSlots, leadMinutes,
   normalizePhone, esc, yen, SEATS, seatLabel, toMin,
-} from "./menu.js?v=20251126-84";
+} from "./menu.js?v=20251127-109";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
 } from "./frozen-menu.js?v=20251126-84";
@@ -22,8 +22,11 @@ const SET_HOLIDAYS = new Set([
   "2026-01-01","2026-01-12","2026-02-11","2026-02-23","2026-03-20","2026-04-29","2026-05-03","2026-05-04","2026-05-05","2026-05-06","2026-07-20","2026-08-11","2026-09-21","2026-09-22","2026-09-23","2026-10-12","2026-11-03","2026-11-23",
   "2027-01-01","2027-01-11","2027-02-11","2027-02-23","2027-03-21","2027-03-22","2027-04-29","2027-05-03","2027-05-04","2027-05-05","2027-07-19","2027-08-11","2027-09-20","2027-09-23","2027-10-11","2027-11-03","2027-11-23",
 ]);
+// セット提供お休みの日（年末年始ポスター 2026-11-27：12/24・12/25は提供お休み。12/30〜1/3は下の年末年始リストで無効）
+const SET_SUSPENDED = new Set(["2026-12-24", "2026-12-25"]);
 function isSetDay(dateStr) {
   if (!dateStr) return false;
+  if (SET_SUSPENDED.has(dateStr)) return false; // セット提供お休み
   const md = dateStr.slice(5);
   if (["12-29","12-30","12-31","01-01","01-02","01-03"].includes(md)) return false; // 年末年始は無効
   if (["08-13","08-14","08-15","08-16"].includes(md)) return false; // お盆は無効
@@ -528,7 +531,7 @@ function startPickupFlow(returnTo) {
   const p = pickupSel[mode];
   if (p && p.date) { selDate = p.date; selTime = p.time; }
   else {
-    selDate = mode === "frozen" ? dateChipList().find(k => !isThursday(k)) : todayKey();
+    selDate = mode === "frozen" ? dateChipList().find(k => !isClosedDay(k)) : todayKey();
     selTime = null;
   }
   $("pickup-title").textContent = p && p.time ? "受け取り日時の変更" : "まず、受け取り日時をお選びください";
@@ -587,8 +590,8 @@ function renderDateChips(el, selected, onPick) {
   const today = todayKey();
   const tomorrow = addDays(today, 1).key;
   el.innerHTML = dateChipList().map(k => `
-    <button data-date="${k}" class="${k === selected ? "active" : ""}" ${isThursday(k) ? "disabled" : ""}>
-      ${formatDateJP(k)}${k === today ? `<span class="today-badge">今日</span>` : k === tomorrow ? `<span class="today-badge">明日</span>` : ""}${isThursday(k) ? "（定休日）" : ""}
+    <button data-date="${k}" class="${k === selected ? "active" : ""}" ${isClosedDay(k) ? "disabled" : ""}>
+      ${formatDateJP(k)}${k === today ? `<span class="today-badge">今日</span>` : k === tomorrow ? `<span class="today-badge">明日</span>` : ""}${closedReason(k) ? `（${closedReason(k)}）` : ""}
     </button>`).join("");
   el.querySelectorAll("button:not(:disabled)").forEach(b =>
     b.addEventListener("click", () => onPick(b.dataset.date)));
@@ -650,7 +653,7 @@ function renderSlots() {
   $("slot-empty").textContent = stoppedToday
     ? "本日の注文受付は終了しました。明日以降の日付でご注文いただけます。"
     : slots.length === 0
-    ? (isThursday(selDate) ? "木曜日は定休日です。別の日をお選びください。" : "本日の受け取り枠は終了しました。別の日をお選びください。")
+    ? (isClosedDay(selDate) ? (closedReason(selDate) === "定休日" ? "木曜日は定休日です。別の日をお選びください。" : `${closedReason(selDate)}のためお休みです。別の日をお選びください。`) : "本日の受け取り枠は終了しました。別の日をお選びください。")
     : slots.every(s => occupiedTimes.has(s)) ? "この日の受け取り枠はすべて埋まっています。別の日をお選びください。" : "";
   $("slot-grid").querySelectorAll("button:not(:disabled)").forEach(b =>
     b.addEventListener("click", () => { selTime = b.dataset.slot; renderSlots(); }));

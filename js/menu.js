@@ -227,9 +227,49 @@ export function weekdayOf(key) {
 
 export function isThursday(key) { return weekdayOf(key) === 4; }
 
-// その日の最終枠 "HH:MM"（日曜17:30 / それ以外19:30）。日付例外（短縮営業等）は営業カレンダーに合わせてここへ追加する
-export const LAST_SLOT_EXCEPTIONS = { "2026-11-28": "17:30" }; // 2026-11-28(土) 恵比寿講で短縮営業（LO17:30）
-export function lastSlot(key) { return LAST_SLOT_EXCEPTIONS[key] || (weekdayOf(key) === 0 ? "17:30" : "19:30"); }
+// 日付ごとの営業例外（営業カレンダー連動）。通常ルール（木曜定休・11:00開始・最終枠は日曜17:30／他19:30）
+// からの変更を日付単位で宣言する。open:true=定休日でも営業 / closed:true=休業（reason は表示用）/
+// first・last=その日の最初・最終の受け取り枠 "HH:MM"。
+export const DATE_OVERRIDES = {
+  "2026-11-28": { last: "17:30" },              // 恵比寿講で短縮営業（LO17:30）
+  "2026-12-22": { first: "13:00" },             // 子どもの行事参加のため13:00から営業
+  "2026-12-24": { open: true },                 // クリスマスイブ臨時営業（木曜）
+  "2026-12-30": { open: true, last: "16:00" },  // 年末短縮営業 11:00〜16:00
+  "2026-12-31": { open: true, last: "16:00" },  // 年末短縮営業（木曜）
+  "2027-01-01": { open: true, last: "16:00" },  // 年始短縮営業
+  "2027-01-02": { open: true, last: "16:00" },  // 年始短縮営業
+  "2027-01-03": { open: true, last: "16:00" },  // 年始短縮営業（日曜だが短縮の範囲）
+  "2027-01-04": { closed: true, reason: "年始休業" },
+  "2027-01-05": { closed: true, reason: "年始休業" },
+  "2027-01-06": { closed: true, reason: "年始休業" },
+  "2027-01-07": { closed: true, reason: "年始休業" },
+};
+export function dateOverride(key) { return DATE_OVERRIDES[key] || null; }
+
+// その日が休業かどうか（木曜定休＋例外）。例外で open の日は木曜でも営業、closed の日は休業。
+export function isClosedDay(key) {
+  const ov = dateOverride(key);
+  if (ov) {
+    if (ov.closed) return true;
+    if (ov.open) return false;
+  }
+  return isThursday(key);
+}
+
+// 休業の理由表示（"定休日" / "年始休業"）。営業日は null。
+export function closedReason(key) {
+  const ov = dateOverride(key);
+  if (ov && ov.closed) return ov.reason || "休業";
+  if (isThursday(key) && !(ov && ov.open)) return "定休日";
+  return null;
+}
+
+// その日の最終枠 "HH:MM"（日曜17:30 / それ以外19:30、例外があればそちら優先）
+export function lastSlot(key) {
+  const ov = dateOverride(key);
+  if (ov && ov.last) return ov.last;
+  return weekdayOf(key) === 0 ? "17:30" : "19:30";
+}
 
 export function toMin(hhmm) { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; }
 export function toHHMM(min) { return `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`; }
@@ -241,18 +281,20 @@ export function leadMinutes(totalQty) {
   return 30;
 }
 
-// 受け取り時刻の候補（10分刻み）を返す。定休日（木）は空配列。
+// 受け取り時刻の候補（10分刻み）を返す。休業日（木曜定休・年始休業など）は空配列。
 export function timeSlots(key, totalQty) {
-  if (isThursday(key)) return [];
+  if (isClosedDay(key)) return [];
   const last = toMin(lastSlot(key));
+  const ov = dateOverride(key);
+  const first = ov && ov.first ? toMin(ov.first) : 11 * 60; // 例外日の開店時刻（例：12/22は13:00）
   let start;
   if (key === todayKey()) {
     const n = jstNowParts();
     const nowMin = n.hh * 60 + n.mm;
     start = Math.ceil((nowMin + leadMinutes(totalQty)) / 10) * 10;
-    if (start < 11 * 60) start = 11 * 60;
+    if (start < first) start = first;
   } else {
-    start = 11 * 60;
+    start = first;
   }
   const slots = [];
   for (let t = start; t <= last; t += 10) slots.push(toHHMM(t));

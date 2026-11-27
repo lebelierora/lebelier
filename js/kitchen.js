@@ -11,7 +11,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   todayKey, addDays, isThursday, formatDateJP, lastSlot, toMin, toHHMM, occupiedTime, esc, yen, seatLabel,
-} from "./menu.js?v=20251126-84";
+} from "./menu.js?v=20251127-109";
 
 const $ = id => document.getElementById(id);
 
