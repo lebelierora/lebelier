@@ -11,7 +11,7 @@ import {
 } from "./menu.js?v=20251127-116";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
-} from "./frozen-menu.js?v=20251127-113";
+} from "./frozen-menu.js?v=20251127-114";
 
 // 焼きピザ・冷凍ピザ両方のメニューから商品を引く
 const anyById = id => menuById(id) || frozenById(id);
@@ -421,10 +421,25 @@ function renderDetail() {
   const it = detail.item;
   // onlyChoice 付きトッピングは、その選択肢を選んだときだけ有効（例：ラテのアイストッピングはアイスのみ）。選択が合わなければ自動で外す
   (it.toppings || []).forEach(t => { if (t.onlyChoice && detail.choice !== t.onlyChoice) detail.toppings.delete(t.label); });
+  // 案内文「↓ 下で味や大きさなどを選べます」は、数量以外の選択肢が実際にある商品だけに出す（下の描画と同じ条件で判定）
+  const choiceVisible = it.choice && (mode === "dinein" || !it.choice.dineInOnly); // dineInOnly の choice は店内のみ（例：生ビールの小サイズ）
+  // 選択肢単位の dineInOnly（例：烏龍茶のホットは店内のみ。テイクアウトはアイスのみ）
+  const visibleOptions = choiceVisible ? it.choice.options.filter(o => mode === "dinein" || !o.dineInOnly) : [];
+  // choice の実効値（無効な選択は外し、残り1つなら自動選択される前提）でトッピングの表示可否も判定する
+  let effChoice = detail.choice;
+  if (choiceVisible) {
+    if (effChoice && !visibleOptions.some(o => o.label === effChoice)) effChoice = null;
+    else if (!effChoice && visibleOptions.length === 1) effChoice = visibleOptions[0].label;
+  }
+  const hasSelectable = (hasCutPack(it) && !(mode === "dinein" && it.noCutDineIn)) // カット（店内でカットなし提供の注記のみの場合は除く）
+    || (hasCutPack(it) && mode === "takeout") // 包装（テイクアウトのみ）
+    || (choiceVisible && visibleOptions.length > 0)
+    || (it.toppings || []).some(t => (mode === "dinein" || !t.dineInOnly) && (!t.onlyChoice || effChoice === t.onlyChoice))
+    || !!timingOptions(it);
   let html = `
     <div class="card" style="padding:0;overflow:hidden;">
-      ${effImg(it) ? `<img class="detail-photo ${it.poster || mode === "frozen" ? "contain" : ""}" src="${esc(effImg(it))}" alt="${esc(it.name)}">
-      <div class="scroll-hint" id="detail-scroll-hint">↓ 下で味や大きさなどを選べます</div>` : ""}
+      ${effImg(it) ? `<img class="detail-photo ${it.poster || mode === "frozen" ? "contain" : ""}" src="${esc(effImg(it))}" alt="${esc(it.name)}">${hasSelectable ? `
+      <div class="scroll-hint" id="detail-scroll-hint">↓ 下で味や大きさなどを選べます</div>` : ""}` : ""}
       <div style="padding:14px;">
         <div style="font-size:20px;font-weight:900;">${esc(it.name)}${it.seasonal ? ` <span class="season-badge">季節メニュー</span>` : ""}${it.eatInBadge ? ` <span class="eatin-badge">イートイン限定</span>` : ""}${mode !== "frozen" && it.cat === AGE_FESTIVAL.cat && isAgeFestival(todayKey()) ? ` <span class="festival-badge">期間限定</span>` : ""}</div>
         ${descHtml(it)}
@@ -475,9 +490,6 @@ function renderDetail() {
     </div>`;
     }
   }
-  const choiceVisible = it.choice && (mode === "dinein" || !it.choice.dineInOnly); // dineInOnly の choice は店内のみ（例：生ビールの小サイズ）
-  // 選択肢単位の dineInOnly（例：烏龍茶のホットは店内のみ。テイクアウトはアイスのみ）
-  const visibleOptions = choiceVisible ? it.choice.options.filter(o => mode === "dinein" || !o.dineInOnly) : [];
   if (choiceVisible) {
     if (detail.choice && !visibleOptions.some(o => o.label === detail.choice)) detail.choice = null;
     if (!detail.choice && visibleOptions.length === 1) detail.choice = visibleOptions[0].label; // 残り1つなら自動選択

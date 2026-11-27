@@ -49,7 +49,7 @@ export const FROZEN_MENU = [
     choice: CHEESE2(860) },
   { id: "fz-jiru-only", cat: "fz-set", name: "群馬ジルチキンだけセット（6個入）", price: 2560, img: "images/fz-jiru-only.jpg",
     desc: "群馬県産小麦100%使用のバジルチキンの揚げピザ、6個入りです。このページだけのオリジナルセットです。賞味期限は製造から90日間です。冷凍自販機でも並行して販売しているため、賞味期限までの期間が45日以内のものをお渡しする場合があります。" },
-  { id: "fz-toro-only", cat: "fz-set", name: "群馬トロフロマッジだけセット", price: 2560, img: "images/fz-toro-only.jpg",
+  { id: "fz-toro-only", cat: "fz-set", name: "群馬トロフロマッジだけセット（6個入）", price: 2560, img: "images/fz-toro-only.jpg",
     desc: "群馬県産小麦100%使用のクアトロフロマッジの揚げピザ、6個入りです。このページだけのオリジナルセットです。賞味期限は製造から90日間です。冷凍自販機でも並行して販売しているため、賞味期限までの期間が45日以内のものをお渡しする場合があります。" },
 
   // ---- 冷凍ホールピザ ----
