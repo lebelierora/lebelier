@@ -104,6 +104,11 @@ function setMode(m) {
   document.body.classList.toggle("frozen", m === "frozen");
   $("frozen-banner").classList.toggle("hidden", m !== "frozen");
   $("frozen-banner2").classList.toggle("hidden", m !== "frozen");
+  // 店内はお席カード内に同趣旨の案内があるため、一覧上の案内はテイクアウト／冷凍だけに出す
+  $("order-guide").classList.toggle("hidden", m === "dinein");
+  $("order-guide").textContent = m === "frozen"
+    ? "ご予約は下のメニューから商品をお選びください"
+    : "ご注文は下のメニューから商品をお選びください";
   updateHeader();
   updateCartbar(false);
 }
@@ -524,6 +529,17 @@ function makeOrderNo() {
   return `${mode === "frozen" ? "F" : "T"}-${String(n.getTime()).slice(-8)}${rand}`;
 }
 let doneUnsub = null;
+let sealGuideTimer = null;
+function guideToSealChoice() {
+  const group = $("seal-group");
+  if (!group) return;
+  group.scrollIntoView({ behavior: "smooth", block: "center" });
+  const field = group.querySelector(".field");
+  if (field) field.classList.add("attention");
+  toast("温め方のシールが必要かお選びください", 2000);
+  clearTimeout(sealGuideTimer);
+  sealGuideTimer = setTimeout(() => { if (field) field.classList.remove("attention"); }, 2400);
+}
 async function submitOrder() {
   const name = $("cust-name").value.trim();
   const phone = normalizePhone($("cust-phone").value);
@@ -531,7 +547,7 @@ async function submitOrder() {
   const err = msg => { $("order-error").innerHTML = `<div class="err" style="margin-top:12px;">${esc(msg)}</div>`; };
   if (cart.length === 0) return err("カートが空です。メニューから商品をお選びください。");
   if (!selTime) return err("受け取り時刻をお選びください。");
-  if (mode === "frozen" && !sealChoice) return err("温め方のシールが必要かお選びください。");
+  if (mode === "frozen" && !sealChoice) { guideToSealChoice(); return err("温め方のシールが必要かお選びください。"); }
   if (!name) return err("お名前を入力してください。");
   if (phone.length < 10) return err("電話番号を正しく入力してください。");
 

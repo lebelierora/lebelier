@@ -27,6 +27,13 @@ main{max-width:720px;margin:0 auto;padding:14px 14px 120px;}
 .tabs button{flex:0 1 auto;max-width:100%;border:2px solid var(--line);background:#fff;border-radius:999px;padding:10px 16px;font-size:15px;font-weight:700;}
 .tabs button.active{background:var(--ink);color:#fff;border-color:var(--ink);}
 
+/* テイクアウト／冷凍のメニュー入口案内（店内はお席カード内の案内を使う） */
+.order-guide{margin:2px 0 10px;font-size:17px;font-weight:800;line-height:1.5;}
+
+/* 冷凍の必須選択（温め方シール）へ誘導するときのハイライト */
+#seal-group .field{border-radius:12px;}
+#seal-group .field.attention{background:#fdedec;box-shadow:0 0 0 3px var(--warn);}
+
 /* 店内バー：注文の入口を明示し、テイクアウト導線は控えめなリンクにする */
 .dinein-order-guide{margin:12px 0 0;font-size:17px;font-weight:800;line-height:1.5;}
 .takeout-link-wrap{margin-top:14px;padding-top:10px;border-top:1px dashed var(--line);font-size:14px;}
