@@ -55,6 +55,18 @@ function updateSetNotes() {
 }
 
 const $ = id => document.getElementById(id);
+
+// 表示用の短い注文番号（英字1文字＋数字4桁）。ドキュメントIDから決定的に算出する表示専用コードで、
+// 保存データ（orderNo等）は変更しない。js/kitchen.js にも同じ実装があり、両者は必ず一致させること。
+function orderCodeFromId(id) {
+  let h = 2166136261; // FNV-1a 32bit（offset basis）
+  const s = String(id || "");
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  const letter = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[h % 26];
+  const digits = 1000 + (Math.floor(h / 26) % 9000);
+  return letter + digits;
+}
+
 const screens = ["scr-home", "scr-seat", "scr-order", "scr-detail", "scr-checkout", "scr-dinein", "scr-done", "scr-status"];
 function show(id) {
   screens.forEach(s => $(s).classList.toggle("hidden", s !== id));
@@ -588,6 +600,9 @@ function renderDoneLink(docId, o) {
     <p class="note" style="margin:0 0 12px;">あとからでも、下のQRコード／リンクを開くと注文状況を確認できます（別のブラウザやスマホでも見られます）。</p>
     <div style="font-weight:900;font-size:21px;line-height:1.55;">るべりえ<br>お受け取り予定：${esc(dateStr)}${timeStr ? ` ${esc(timeStr)}` : ""}</div>
     <p class="note" style="margin:2px 0 10px;">※お受け取り日時はご希望です。お店の確定で変更になる場合があります</p>
+    <div style="margin:12px 0 2px;font-weight:800;">注文番号</div>
+    <div style="font-weight:900;font-size:46px;letter-spacing:.06em;line-height:1.15;">${esc(orderCodeFromId(docId))}</div>
+    <p class="note" style="margin:2px 0 10px;">お受け取りのとき、この番号をお見せください</p>
     ${qrHtml ? `<div style="margin:4px auto;">${qrHtml}</div>` : ""}
     <div style="word-break:break-all;font-size:13px;margin:10px 0;">${esc(url)}</div>
     <button class="btn" id="done-copy-link">リンクをコピー</button>
@@ -650,7 +665,8 @@ function showDone(docId, orderNo) {
       html += `<h2 style="margin:8px 0;">このご注文は「来店なし」として処理されました</h2>
         <p class="note">ご不明な点はお電話ください（0276-70-2321）。</p>`;
     }
-    html += `<p class="note" style="margin-top:12px;">注文番号：${esc(o.orderNo || orderNo)}<br>
+    html += `<div style="margin-top:14px;"><div style="font-weight:800;">注文番号</div><div style="font-weight:900;font-size:40px;letter-spacing:.06em;line-height:1.15;">${esc(orderCodeFromId(docId))}</div></div>
+    <p class="note" style="margin-top:8px;">
       受け取り日時：${esc(formatDateJP(o.pickupDate))} ${esc(o.requestedPickup)}
       ${o.confirmedPickup && o.confirmedPickup !== o.requestedPickup ? `（確定：${esc(o.confirmedPickup)}）` : ""}<br>
       合計：${yen(o.total)}（お支払いは受け取り時にレジでお願いします）</p></div>`;
@@ -691,7 +707,7 @@ function renderStatusResults() {
     $("status-results").innerHTML = `<h3>${esc(formatDateJP(statusDate))}のご注文（${orders.length}件）</h3>` +
       orders.map(o => `<div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span class="note">注文番号 ${esc(o.orderNo)}${o.kind === "frozen" ? "（冷凍ピザ予約）" : ""}</span>${statusChip(o.status)}
+          <span><span class="note" style="display:block;">注文番号${o.kind === "frozen" ? "（冷凍ピザ予約）" : ""}</span><span style="font-weight:900;font-size:30px;letter-spacing:.05em;">${esc(orderCodeFromId(o._id))}</span></span>${statusChip(o.status)}
         </div>
         <div class="big-time" style="font-size:26px;margin-top:8px;">受け取り：${esc(o.confirmedPickup || o.requestedPickup)}</div>
         ${o.setMeal ? `<p class="set-note">🍕 平日セット対象です。揚げ物をサービスでお付けします。</p>` : ""}
@@ -835,7 +851,8 @@ function showDineinDone(docId, orderNo) {
     } else if (o.status === "done") {
       html += `<h2 style="margin:8px 0;">提供済みです。ありがとうございました</h2>`;
     }
-    html += `<p class="note" style="margin-top:12px;">注文番号：${esc(o.orderNo || orderNo)}<br>
+    html += `<div style="margin-top:14px;"><div style="font-weight:800;">注文番号</div><div style="font-weight:900;font-size:40px;letter-spacing:.06em;line-height:1.15;">${esc(orderCodeFromId(docId))}</div></div>
+    <p class="note" style="margin-top:8px;">
       お席：${esc(o.seatLabel || seatLabel(o.seat))}<br>
       合計：${yen(o.total)}（お会計はお帰りの際にレジでお願いします）</p></div>`;
     $("done-body").innerHTML = html;

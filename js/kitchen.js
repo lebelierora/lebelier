@@ -14,6 +14,17 @@ import {
 
 const $ = id => document.getElementById(id);
 
+// 表示用の短い注文番号（英字1文字＋数字4桁）。ドキュメントIDから決定的に算出する表示専用コードで、
+// 保存データ（orderNo等）は変更しない。js/customer.js にも同じ実装があり、両者は必ず一致させること。
+function orderCodeFromId(id) {
+  let h = 2166136261; // FNV-1a 32bit（offset basis）
+  const s = String(id || "");
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  const letter = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[h % 26];
+  const digits = 1000 + (Math.floor(h / 26) % 9000);
+  return letter + digits;
+}
+
 // ---------- ログイン（Firebase Auth） ----------
 let kitchenOpen = false;
 $("login-btn").addEventListener("click", tryLogin);
@@ -127,8 +138,8 @@ function buildTicketHtml(kind, o) {
     `<div style="text-align:center;font-size:26px;font-weight:bold;">${sub}</div>` +
     '<hr>' +
     (kind === "dinein"
-      ? `<div style="font-size:20px;">注文番号 ${esc(o.orderNo || "")}${dineinTime.startsWith("9999") ? "" : `／注文時刻 ${esc(dineinTime.slice(11))}`}</div>`
-      : `<div style="font-size:22px;font-weight:bold;">${esc(o.name || "")} 様</div><div style="font-size:20px;">注文番号 ${esc(o.orderNo || "")}</div>`) +
+      ? `<div style="font-size:34px;font-weight:bold;">注文番号 ${esc(orderCodeFromId(o.id))}</div>${dineinTime.startsWith("9999") ? "" : `<div style="font-size:20px;">注文時刻 ${esc(dineinTime.slice(11))}</div>`}`
+      : `<div style="font-size:22px;font-weight:bold;">${esc(o.name || "")} 様</div><div style="font-size:34px;font-weight:bold;">注文番号 ${esc(orderCodeFromId(o.id))}</div>`) +
     ticketItemsHtml(o) +
     (o.setMeal ? '<div style="font-size:20px;font-weight:bold;">平日セット対象：揚げ物をサービスで付ける</div>' : "") +
     (o.note ? `<div style="font-size:20px;">備考：${esc(o.note)}</div>` : "") +
@@ -405,8 +416,9 @@ function dineinCardHtml(o) {
   const stLabel = o.status === "pending" ? "確認待ち" : o.status === "accepted" ? "受付済み" : "提供済み";
   return `<div class="kcard ${isPending ? "pending" : ""}">
     <div>
-      <div class="pdate"><span class="kind-chip">店内</span> ／ ${esc(o.orderNo)} ／ ${stLabel}</div>
+      <div class="pdate"><span class="kind-chip">店内</span> ／ ${stLabel}</div>
       <div class="ptime">${esc(o.seatLabel || seatLabel(o.seat))}</div>
+      <div style="font-weight:900;font-size:34px;letter-spacing:.05em;line-height:1.1;">注文番号 ${esc(orderCodeFromId(o.id))}</div>
     </div>
     <div>${itemsHtml(o)}</div>
     <div class="ktotal">合計 ${yen(o.total)}</div>
@@ -482,9 +494,10 @@ function cardHtml(o) {
   const mainTime = o.status === "confirmed" && o.confirmedPickup ? o.confirmedPickup : o.requestedPickup;
   return `<div class="kcard ${isPending ? "pending" : ""}">
     <div>
-      <div class="pdate">${o.kind === "frozen" ? `<span class="kind-chip" style="background:#5b2c6f;">冷凍予約</span>` : `<span class="kind-chip" style="background:#2e86c1;">テイクアウト</span>`} ${esc(formatDateJP(o.pickupDate))} ／ ${esc(o.orderNo)} ／ ${o.status === "pending" ? "確認待ち" : o.status === "confirmed" ? "確定" : o.status === "done" ? "お渡し済み" : "来店なし"}</div>
+      <div class="pdate">${o.kind === "frozen" ? `<span class="kind-chip" style="background:#5b2c6f;">冷凍予約</span>` : `<span class="kind-chip" style="background:#2e86c1;">テイクアウト</span>`} ${esc(formatDateJP(o.pickupDate))} ／ ${o.status === "pending" ? "確認待ち" : o.status === "confirmed" ? "確定" : o.status === "done" ? "お渡し済み" : "来店なし"}</div>
       <div class="ptime">${esc(mainTime)}</div>
       ${countdownText(o) ? `<div>${countdownText(o)}</div>` : ""}
+      <div style="font-weight:900;font-size:34px;letter-spacing:.05em;line-height:1.1;">注文番号 ${esc(orderCodeFromId(o.id))}</div>
     </div>
     <div>${regularBadge(o)} <strong style="font-size:18px;">${esc(o.name)} 様</strong>
       <a href="tel:${esc(o.phone)}" style="font-weight:800;">${esc(o.phone)}</a></div>
