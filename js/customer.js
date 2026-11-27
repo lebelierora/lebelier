@@ -187,10 +187,12 @@ function timingOptions(it) {
 let detail = null; // {item, cut, pack, choice, toppings:Set, qty, timing}
 function openDetail(id) {
   const item = anyById(id);
-  detail = { item, cut: "nocut", pack: "paper",
+  detail = { item, cut: null, pack: "paper",
              choice: null, // choice は未選択スタート。選ぶまでカートに入れられない
              toppings: new Set(), qty: 1, descOpen: false,
              timing: null }; // 提供タイミングも未選択スタート。タイミングがある商品は選ぶまでカートに入れられない
+             // カットも未選択スタート（2026-11-27 本人決定）。カット選択が出る商品は選ぶまでカートに入れられない。
+             // ただし店内でカットなし固定の商品（noCutDineIn）は選択肢がないので対象外（renderDetail で nocut に固定される）
   renderDetail();
   show("scr-detail");
 }
@@ -262,6 +264,26 @@ function guideToRequiredChoice() {
     if (alert) alert.classList.add("hidden");
   }, 2400);
 }
+function detailCutMissing() {
+  if (!detail) return false;
+  // カット選択が出る商品だけ必須。店内でカットなし固定の商品（noCutDineIn）は選択肢自体がないので対象外
+  return hasCutPack(detail.item) && !(mode === "dinein" && detail.item.noCutDineIn) && !detail.cut;
+}
+let cutGuideTimer = null;
+function guideToRequiredCut() {
+  const group = $("cut-group");
+  if (!group) return;
+  group.scrollIntoView({ behavior: "smooth", block: "center" });
+  group.classList.add("attention");
+  const alert = $("cut-alert");
+  if (alert) alert.classList.remove("hidden");
+  toast("カットの仕方をお選びください", 1800);
+  clearTimeout(cutGuideTimer);
+  cutGuideTimer = setTimeout(() => {
+    group.classList.remove("attention");
+    if (alert) alert.classList.add("hidden");
+  }, 2400);
+}
 function detailTimingMissing() {
   if (!detail) return false;
   return !!timingOptions(detail.item) && !detail.timing;
@@ -283,6 +305,7 @@ function guideToRequiredTiming() {
 }
 function tryAddDetailToCart() {
   if (!detail) return;
+  if (detailCutMissing()) { guideToRequiredCut(); return; }
   if (detailChoiceMissing()) { guideToRequiredChoice(); return; }
   if (detailTimingMissing()) { guideToRequiredTiming(); return; }
   const it = detail.item;
@@ -332,13 +355,14 @@ function renderDetail() {
     </div>`;
     } else {
     html += `
-    <div class="opt-group">
+    <div class="opt-group" id="cut-group">
       <div class="label">カット</div>
       <div class="opt-row">
         <button id="cut-nocut" class="${detail.cut === "nocut" ? "active" : ""}">未カット</button>
         <button id="cut-cut4" class="${detail.cut === "cut4" ? "active" : ""}" ${detail.pack === "box" ? "disabled" : ""}>4カット</button>${mode === "dinein" && (it.cat === "hall" || it.cat === "sweetpizza") ? `<button id="cut-cut6" class="${detail.cut === "cut6" ? "active" : ""}">6カット</button>` : ""}
       </div>
       ${detail.pack === "box" ? `<div class="opt-note">箱はカットなしのお渡しです</div>` : ""}
+      ${detail.cut ? "" : `<div class="opt-note">お選びください（必須）</div><div class="choice-alert hidden" id="cut-alert">カットの仕方をお選びください</div>`}
     </div>`;
     }
     // 包装（箱）はテイクアウトのみ。店内では出さない
