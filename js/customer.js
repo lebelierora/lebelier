@@ -11,7 +11,7 @@ import {
 } from "./menu.js?v=20251127-116";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
-} from "./frozen-menu.js?v=20251127-112";
+} from "./frozen-menu.js?v=20251127-113";
 
 // 焼きピザ・冷凍ピザ両方のメニューから商品を引く
 const anyById = id => menuById(id) || frozenById(id);
@@ -862,7 +862,7 @@ function guideToSealChoice() {
   group.scrollIntoView({ behavior: "smooth", block: "center" });
   const field = group.querySelector(".field");
   if (field) field.classList.add("attention");
-  toast("温め方のシールが必要かお選びください", 2000);
+  toast("温め方シールを希望するかお選びください", 2000);
   clearTimeout(sealGuideTimer);
   sealGuideTimer = setTimeout(() => { if (field) field.classList.remove("attention"); }, 2400);
 }
@@ -884,7 +884,7 @@ async function submitOrder() {
     return;
   }
   if (!selTime) return err("受け取り時刻をお選びください。");
-  if (mode === "frozen" && !sealChoice) { guideToSealChoice(); return err("温め方のシールが必要かお選びください。"); }
+  if (mode === "frozen" && !sealChoice) { guideToSealChoice(); return err("温め方シールを希望するかお選びください。"); }
   if (!name) return err("お名前を入力してください。");
   if (phone.length < 10) return err("電話番号を正しく入力してください。");
 
@@ -1059,7 +1059,7 @@ function showDone(docId, orderNo) {
     if (linkBox && linkBox.dataset.forId !== docId) { renderDoneLink(docId, o); linkBox.dataset.forId = docId; }
     let html = `<div class="card" style="text-align:center;">`;
     if (o.kind === "frozen") html += `<p class="note" style="font-weight:900;font-size:16px;">冷凍ピザの店頭予約</p><div class="frozen-banner">🧊 ご来店の際は、保冷バッグと保冷剤をご持参ください（冷凍ピザのお持ち帰り用です）</div>`;
-    if (o.kind === "frozen" && o.seal) html += `<p class="note" style="font-weight:800;">温め方のシール：${o.seal === "none" ? "不用（お付けしません）" : "必要"}</p>`;
+    if (o.kind === "frozen" && o.seal) html += `<p class="note" style="font-weight:800;">温め方のシール：${o.seal === "none" ? "希望しない（お付けしません）" : "希望する"}</p>`;
     if (o.setMeal) html += `<p class="set-note" style="text-align:left;">🍕 平日セット対象です。揚げ物をサービスでお付けします。</p>`;
     if (o.status === "pending") {
       html += `<div style="font-size:40px;">⌛</div>

@@ -18,7 +18,8 @@
   <!-- トップ -->
   <section id="scr-home">
     <div class="logo-banner"><img src="images/shop-banner.jpg" alt="るべりえ 店舗外観"></div>
-    <button class="btn" id="go-order" style="margin-bottom:12px;">出来立てメニューを注文する</button>
+    <button class="btn" id="go-order" style="margin-bottom:4px;">出来立てメニューを注文する</button>
+    <p class="note" style="margin:0 0 12px;">店内でお召し上がりの方は、お席のQRコードからご注文ください。</p>
     <button class="btn" id="go-frozen" style="margin-bottom:4px;">冷凍ピザを店頭で受け取る</button>
     <p class="note" style="margin:0 0 12px;">受け取りは翌々日から選べます</p>
     <button class="btn ghost" id="go-status">注文状況を見る</button>
@@ -58,7 +59,7 @@
           <span class="guide-arrow">▾</span>
         </button>
         <div class="guide-body hidden">
-          <p>冷凍ピザは店頭での受け取り予約ができます。ご用意に時間がかかるため、受け取りは翌々日から1週間先まででお願いしています。当日・翌日にご希望の場合は、お電話でご相談ください（できる日はお電話でお受けします）。店頭の冷凍自販機の商品は24時間いつでもその場で買えますので、このページには載せていません。ご来店の際は、保冷バッグと保冷剤をご持参ください。</p>
+          <p>冷凍ピザは店頭での受け取り予約ができます。ご用意に時間がかかるため、ご注文の2日後から、予約画面に表示される日付でお受け取りいただけます。当日・翌日にご希望の場合は、お電話でご相談ください（できる日はお電話でお受けします）。店頭の冷凍自販機は24時間、予約なしで購入できます。店頭受け取りを予約する方は、このページで商品をお選びください。ご来店の際は、保冷バッグと保冷剤をご持参ください。</p>
         </div>
       </div>
       <div class="guide-item">
@@ -174,12 +175,12 @@
     <div id="seal-group" class="hidden">
       <h2 style="margin:18px 0 6px;">温め方のシール</h2>
       <div class="field">
-        <label>温め方の説明シールが必要かお選びください（必須）</label>
+        <label>温め方シールを希望しますか？（必須）</label>
         <div class="opt-row">
-          <button id="seal-yes" type="button">必要（各商品に貼ります）</button>
-          <button id="seal-no" type="button">不用（貼りません）</button>
+          <button id="seal-yes" type="button">希望する</button>
+          <button id="seal-no" type="button">希望しない</button>
         </div>
-        <p class="note" style="margin-top:8px;">温め方をご存じの方は「不用」で大丈夫です。その場合、シールはお付けしません。温め方は<a href="https://lebelierora.github.io/guide/" target="_blank" rel="noopener">こちら</a>からも確認できます。なお、冷凍自販機の商品をそのままお渡しする場合は、温め方のシールが貼ってある場合があります。</p>
+        <p class="note" style="margin-top:8px;">温め方をご存じの方は「希望しない」で大丈夫です。その場合、シールはお付けしません。温め方は<a href="https://lebelierora.github.io/guide/" target="_blank" rel="noopener">こちら</a>からも確認できます。なお、すでにシールが貼ってある商品は、そのままお渡しします。</p>
       </div>
     </div>
     <h2 style="margin:18px 0 6px;">お客様情報</h2>
@@ -290,6 +291,6 @@
 <div class="toast" id="toast"></div>
 
 <script src="js/qrcode.js"></script>
-<script type="module" src="js/customer.js?v=20251127-123"></script>
+<script type="module" src="js/customer.js?v=20251127-124"></script>
 </body>
 </html>
