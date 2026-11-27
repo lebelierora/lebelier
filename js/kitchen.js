@@ -114,9 +114,9 @@ function ticketItemsHtml(o) {
                     i.choice || null,
                     ...(i.toppings || [])].filter(Boolean).join("／");
     const timing = (i.timing && i.timing !== "すぐ提供" && i.timing !== "できた順")
-      ? `<div style="font-size:26px;font-weight:bold;">提供：${esc(i.timing)}</div>` : "";
-    return `<div style="font-size:29px;font-weight:bold;">${esc(i.name)} × ${i.qty}</div>` +
-      (custom ? `<div style="font-size:25px;">${esc(custom)}</div>` : "") + timing;
+      ? `<div style="font-size:36px;font-weight:bold;">提供：${esc(i.timing)}</div>` : "";
+    return `<div style="font-size:40px;font-weight:bold;">${esc(i.name)} × ${i.qty}</div>` +
+      (custom ? `<div style="font-size:34px;">${esc(custom)}</div>` : "") + timing;
   }).join("");
 }
 function buildTicketHtml(kind, o) {
@@ -133,19 +133,19 @@ function buildTicketHtml(kind, o) {
   }
   const dineinTime = tsSortKey(o.createdAt);
   return '<html><head><meta charset="utf-8"><meta name="format-detection" content="telephone=no"></head><body style="font-family:sans-serif;">' +
-    '<div style="text-align:center;font-size:34px;font-weight:bold;">るべりえ</div>' +
-    `<div style="text-align:center;font-size:39px;font-weight:bold;">${head}</div>` +
-    `<div style="text-align:center;font-size:34px;font-weight:bold;">${sub}</div>` +
+    '<div style="text-align:center;font-size:48px;font-weight:bold;">るべりえ</div>' +
+    `<div style="text-align:center;font-size:54px;font-weight:bold;">${head}</div>` +
+    `<div style="text-align:center;font-size:48px;font-weight:bold;">${sub}</div>` +
     '<hr>' +
     (kind === "dinein"
-      ? `<div style="font-size:44px;font-weight:bold;">注文番号 ${esc(orderCodeFromId(o.id))}</div>${dineinTime.startsWith("9999") ? "" : `<div style="font-size:26px;">注文時刻 ${esc(dineinTime.slice(11))}</div>`}`
-      : `<div style="font-size:29px;font-weight:bold;">${esc(o.name || "")} 様</div><div style="font-size:44px;font-weight:bold;">注文番号 ${esc(orderCodeFromId(o.id))}</div>`) +
+      ? `<div style="font-size:60px;font-weight:bold;">注文番号 ${esc(orderCodeFromId(o.id))}</div>${dineinTime.startsWith("9999") ? "" : `<div style="font-size:36px;">注文時刻 ${esc(dineinTime.slice(11))}</div>`}`
+      : `<div style="font-size:40px;font-weight:bold;">${esc(o.name || "")} 様</div><div style="font-size:60px;font-weight:bold;">注文番号 ${esc(orderCodeFromId(o.id))}</div>`) +
     ticketItemsHtml(o) +
-    (o.setMeal ? '<div style="font-size:26px;font-weight:bold;">平日セット対象：揚げ物をサービスで付ける</div>' : "") +
-    (o.note ? `<div style="font-size:26px;">備考：${esc(o.note)}</div>` : "") +
-    (o.kind === "frozen" && o.seal ? `<div style="font-size:26px;font-weight:bold;">温め方シール：${o.seal === "none" ? "不要（貼らない）" : "必要（各商品に貼る）"}</div>` : "") +
+    (o.setMeal ? '<div style="font-size:36px;font-weight:bold;">平日セット対象：揚げ物をサービスで付ける</div>' : "") +
+    (o.note ? `<div style="font-size:36px;">備考：${esc(o.note)}</div>` : "") +
+    (o.kind === "frozen" && o.seal ? `<div style="font-size:36px;font-weight:bold;">温め方シール：${o.seal === "none" ? "不要（貼らない）" : "必要（各商品に貼る）"}</div>` : "") +
     '<hr>' +
-    `<div style="font-size:31px;font-weight:bold;">合計 ${yen(o.total)}</div>` +
+    `<div style="font-size:42px;font-weight:bold;">合計 ${yen(o.total)}</div>` +
     '</body></html>';
 }
 
