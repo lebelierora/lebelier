@@ -57,6 +57,13 @@
   .print-msg.fail{background:#fdedec;border-color:var(--warn);color:#922b21;}
   .print-warn{background:#fdedec;border:2px solid var(--warn);color:#922b21;border-radius:10px;padding:6px 10px;font-weight:900;font-size:17px;}
   .print-flash-btn{flex:1;min-height:64px;border:none;border-radius:12px;background:var(--warn);color:#fff;font-size:22px;font-weight:900;animation:flash 1.1s steps(2,start) infinite;cursor:pointer;}
+  .danger-zone{border:3px solid #c0392b;border-radius:14px;padding:14px;margin-top:10px;background:#fdf2f2;}
+  .danger-btn{min-height:56px;padding:10px 22px;border-radius:12px;border:3px solid #c0392b;background:#fff;color:#c0392b;font-size:18px;font-weight:900;cursor:pointer;}
+  .danger-btn:disabled{opacity:.45;cursor:not-allowed;}
+  .danger-fill{min-height:56px;padding:10px 22px;border-radius:12px;border:none;background:#c0392b;color:#fff;font-size:18px;font-weight:900;cursor:pointer;}
+  .danger-fill:disabled{opacity:.45;cursor:not-allowed;}
+  .reset-status{margin-top:10px;font-size:16px;font-weight:800;white-space:pre-wrap;}
+  .reset-status.err{color:#c0392b;}
   </style>
 </head>
 <body>
@@ -107,12 +114,34 @@
     <summary>要注意リスト（ブロック中の電話番号）</summary>
     <div id="blocked-list" style="margin-top:10px;"></div>
   </details>
+
+  <details class="finished" id="reset-section">
+    <summary style="color:#c0392b;">⚠ テストデータのリセット（本番公開前に使う機能）</summary>
+    <div class="danger-zone">
+      <p class="note" style="font-size:16px;">テストで入れた注文・呼び出し・受け取り枠を<strong>全て削除</strong>して、まっさらな状態に戻します。要注意リスト（ブロック中の電話番号）は削除されません。<br><strong style="color:#c0392b;">本番の注文が入った後は絶対に押さないでください。</strong></p>
+      <div id="reset-controls">
+        <button class="danger-btn" id="reset-btn" type="button">テストデータを全てリセット</button>
+        <div id="reset-confirm" class="hidden" style="margin-top:14px;">
+          <p id="reset-counts" style="font-weight:900;font-size:18px;margin:0 0 6px;"></p>
+          <p class="note" style="font-size:16px;">上記のデータを全て削除します。この操作は取り消せません。</p>
+          <div class="act-row">
+            <button class="danger-fill" id="reset-exec" type="button">削除を実行する</button>
+            <button class="btn ghost" id="reset-cancel" type="button">やめる</button>
+          </div>
+        </div>
+      </div>
+      <div id="reset-status" class="reset-status"></div>
+    </div>
+  </details>
+  <div style="text-align:right;margin-top:20px;">
+    <a href="#" id="reset-show-link" class="hidden" style="font-size:12px;color:#999;">テストデータリセットを表示する</a>
+  </div>
 </main>
 
 <div class="flash-banner hidden" id="flash-banner">新しい注文があります</div>
 <audio id="order-sound" src="audio/moko-order-v2.mp3" preload="auto"></audio>
 <audio id="call-sound" src="audio/moko-call-v2.mp3" preload="auto"></audio>
 
-<script type="module" src="js/kitchen.js?v=20251127-103"></script>
+<script type="module" src="js/kitchen.js?v=20251127-104"></script>
 </body>
 </html>

@@ -4,6 +4,7 @@
 import { db, auth } from "./firebase-config.js?v=20251126-84";
 import {
   collection, onSnapshot, query, where, doc, updateDoc, setDoc, deleteDoc, deleteField, serverTimestamp,
+  getDocs, writeBatch,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   signInWithEmailAndPassword, onAuthStateChanged, signOut,
@@ -640,6 +641,119 @@ function renderBlocked() {
     await deleteDoc(doc(db, "blockedPhones", btn.dataset.unblock));
   }));
 }
+
+// ---------- テストデータのリセット ----------
+// 本番公開前に、テストで入れたデータを全削除してまっさらに戻すための機能。
+// 削除対象：takeoutOrders / dineInOrders / calls の全ドキュメントと、daySlots の全ドキュメント（受け取り枠の解放）。
+// blockedPhones（要注意リスト）は実データなので絶対に触らない。
+// リセットが正常完了したらボタン一式を隠し、その端末の localStorage に覚えさせる（次回開いても出てこない）。
+// 完全に消すのではなく、管理エリアの隅の小さいリンクから再表示できる。失敗・中断時は隠さない。
+const RESET_HIDDEN_KEY = "kitchenTestResetHidden";
+const RESET_TARGETS = [
+  { name: "takeoutOrders", label: "テイクアウト・冷凍の注文" },
+  { name: "dineInOrders", label: "店内注文" },
+  { name: "calls", label: "呼び出し" },
+  { name: "daySlots", label: "受け取り枠" },
+];
+let resetRefs = null; // 確認パネル表示時に取得した削除対象 { コレクション名: [参照...] }
+let resetting = false;
+
+function setResetStatus(msg, isErr) {
+  const el = $("reset-status");
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.toggle("err", !!isErr);
+}
+function applyResetVisibility() {
+  let hidden = false;
+  try { hidden = localStorage.getItem(RESET_HIDDEN_KEY) === "1"; } catch (e) {}
+  $("reset-section").classList.toggle("hidden", hidden);
+  $("reset-show-link").classList.toggle("hidden", !hidden);
+}
+$("reset-show-link").addEventListener("click", e => {
+  e.preventDefault();
+  try { localStorage.removeItem(RESET_HIDDEN_KEY); } catch (err) {}
+  applyResetVisibility();
+  $("reset-section").open = true;
+});
+applyResetVisibility();
+
+$("reset-btn").addEventListener("click", async () => {
+  if (resetting) return;
+  const btn = $("reset-btn");
+  btn.disabled = true;
+  setResetStatus("件数を確認しています…", false);
+  try {
+    resetRefs = {};
+    const lines = [];
+    for (const t of RESET_TARGETS) {
+      const snap = await getDocs(collection(db, t.name));
+      resetRefs[t.name] = snap.docs.map(d => d.ref);
+      lines.push(t.name === "daySlots" ? `受け取り枠：${snap.size}日分` : `${t.label}：${snap.size}件`);
+    }
+    $("reset-counts").textContent = lines.join(" ／ ");
+    $("reset-confirm").classList.remove("hidden");
+    setResetStatus("内容を確認して「削除を実行する」を押してください。", false);
+  } catch (e) {
+    console.error("リセット前の件数取得に失敗", e);
+    resetRefs = null;
+    setResetStatus(`件数の確認に失敗しました：${e.message || e}`, true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("reset-cancel").addEventListener("click", () => {
+  resetRefs = null;
+  $("reset-confirm").classList.add("hidden");
+  setResetStatus("", false);
+});
+
+$("reset-exec").addEventListener("click", async () => {
+  if (resetting || !resetRefs) return;
+  const total = name => (resetRefs[name] || []).length;
+  // 2回目の確認（1回目は確認パネルの表示）。文言を変えて誤操作を防ぐ。
+  if (!confirm(`本当に全て削除しますか？\nテイクアウト・冷凍の注文 ${total("takeoutOrders")}件／店内注文 ${total("dineInOrders")}件／呼び出し ${total("calls")}件／受け取り枠 ${total("daySlots")}日分が消えます。\nこの操作は取り消せません。`)) return;
+  resetting = true;
+  $("reset-exec").disabled = true;
+  $("reset-cancel").disabled = true;
+  $("reset-btn").disabled = true;
+  const doneCounts = {};
+  try {
+    for (const t of RESET_TARGETS) {
+      const refs = resetRefs[t.name] || [];
+      let deleted = 0;
+      for (let i = 0; i < refs.length; i += 400) {
+        const batch = writeBatch(db);
+        refs.slice(i, i + 400).forEach(r => batch.delete(r));
+        await batch.commit();
+        deleted += Math.min(400, refs.length - i);
+        doneCounts[t.name] = deleted;
+        setResetStatus(`削除中… ${t.label} ${deleted}/${refs.length}${t.name === "daySlots" ? "日分" : "件"}`, false);
+      }
+      doneCounts[t.name] = deleted;
+    }
+    const orderTotal = (doneCounts.takeoutOrders || 0) + (doneCounts.dineInOrders || 0);
+    setResetStatus(`リセット完了：注文${orderTotal}件（テイクアウト・冷凍 ${doneCounts.takeoutOrders || 0}件＋店内 ${doneCounts.dineInOrders || 0}件）・呼び出し${doneCounts.calls || 0}件・枠${doneCounts.daySlots || 0}日分を削除しました`, false);
+    // 正常完了したのでボタン一式を隠し、この端末に覚えさせる（完了メッセージだけ残す）
+    $("reset-confirm").classList.add("hidden");
+    $("reset-controls").classList.add("hidden");
+    resetRefs = null;
+    try { localStorage.setItem(RESET_HIDDEN_KEY, "1"); } catch (e) {}
+    $("reset-show-link").classList.remove("hidden");
+  } catch (e) {
+    console.error("リセットに失敗", e);
+    const doneText = RESET_TARGETS.filter(t => doneCounts[t.name] !== undefined)
+      .map(t => `${t.label} ${doneCounts[t.name]}${t.name === "daySlots" ? "日分" : "件"}`).join("／");
+    setResetStatus(`リセットに失敗しました：${e.message || e}${doneText ? `（削除済み：${doneText}。残りはもう一度お試しください）` : ""}`, true);
+    // 失敗時は隠さない（再実行できることを優先）
+  } finally {
+    resetting = false;
+    $("reset-exec").disabled = false;
+    $("reset-cancel").disabled = false;
+    $("reset-btn").disabled = false;
+  }
+});
 
 // ---------- 音声 ----------
 // すべての通知音は単一キューを通して直列に鳴らす（同時に1つだけ。注文の声と呼び出しの声が重ならない）。
