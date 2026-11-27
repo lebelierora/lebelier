@@ -8,7 +8,7 @@ import {
   todayKey, addDays, formatDateJP, isClosedDay, closedReason, timeSlots, leadMinutes,
   normalizePhone, esc, yen, SEATS, seatLabel, toMin, bookingEndKey, advanceGate,
   AGE_FESTIVAL, isAgeFestival,
-} from "./menu.js?v=20251127-112";
+} from "./menu.js?v=20251127-113";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
 } from "./frozen-menu.js?v=20251127-112";
