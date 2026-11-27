@@ -16,6 +16,7 @@ main{max-width:720px;margin:0 auto;padding:14px 14px 120px;}
 .btn{display:block;width:100%;border:none;border-radius:14px;padding:16px;font-size:17px;font-weight:800;background:var(--red);color:#fff;}
 .btn:active{background:var(--red-dark);}
 .btn.ghost{background:#fff;color:var(--ink);border:2px solid var(--line);}
+.btn.ghost.danger{background:#fff;color:var(--warn);border:2px solid var(--warn);}
 .btn.small{width:auto;display:inline-block;padding:10px 18px;font-size:15px;}
 .btn:disabled{opacity:.45;cursor:not-allowed;}
 .card{background:var(--card);border:2px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px;}
@@ -163,7 +164,7 @@ main{max-width:720px;margin:0 auto;padding:14px 14px 120px;}
 .guide-body .note{font-size:12px;}
 
 .status-chip{display:inline-block;border-radius:999px;padding:3px 12px;font-size:13px;font-weight:800;color:#fff;}
-.status-pending{background:#e67e22;} .status-confirmed{background:var(--ok);} .status-done{background:#7f8c8d;} .status-noshow{background:#555;}
+.status-pending{background:#e67e22;} .status-confirmed{background:var(--ok);} .status-done{background:#7f8c8d;} .status-noshow{background:#555;} .status-cancelled{background:#922b21;}
 .big-time{font-size:34px;font-weight:900;line-height:1.2;}
 
 /* 冷凍モードは横長写真を切らずに全体表示する */

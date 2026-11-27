@@ -232,7 +232,7 @@ function openKitchen() {
 
 // ---------- 受け取り枠（daySlots）の保守 ----------
 // 焼きピザの「1枠1注文」は日次サマリ daySlots/{日付}.taken{時刻: 注文番号} で管理する。
-// お客様側が注文時に枠を取り、厨房側は確定時刻の変更・お渡し済み・来店なしで枠を動かす/空ける。
+// お客様側が注文時に枠を取り、厨房側は確定時刻の変更・お渡し済み・来店なし・取り消しで枠を動かす/空ける。
 async function freeSlot(o) {
   if (!o || o.kind === "frozen") return;
   const date = o.confirmedDate || o.pickupDate;
@@ -363,7 +363,7 @@ function activeOrders() {
       .localeCompare(b.pickupDate + (b.confirmedPickup || b.requestedPickup)));
 }
 function finishedOrders() {
-  return orders.filter(o => o.status === "done" || o.status === "noshow")
+  return orders.filter(o => o.status === "done" || o.status === "noshow" || o.status === "cancelled")
     .sort((a, b) => (b.pickupDate + b.requestedPickup).localeCompare(a.pickupDate + a.requestedPickup));
 }
 function doneCountFor(phone, excludeId) {
@@ -555,7 +555,7 @@ function cardHtml(o) {
   const mainTime = o.status === "confirmed" && o.confirmedPickup ? o.confirmedPickup : o.requestedPickup;
   return `<div class="kcard ${isPending ? "pending" : ""}">
     <div>
-      <div class="pdate">${o.kind === "frozen" ? `<span class="kind-chip" style="background:#5b2c6f;">冷凍予約</span>` : `<span class="kind-chip" style="background:#2e86c1;">テイクアウト</span>`} ${esc(formatDateJP(o.pickupDate))} ／ ${o.status === "pending" ? "確認待ち" : o.status === "confirmed" ? "確定" : o.status === "done" ? "お渡し済み" : "来店なし"}</div>
+      <div class="pdate">${o.kind === "frozen" ? `<span class="kind-chip" style="background:#5b2c6f;">冷凍予約</span>` : `<span class="kind-chip" style="background:#2e86c1;">テイクアウト</span>`} ${esc(formatDateJP(o.pickupDate))} ／ ${o.status === "pending" ? "確認待ち" : o.status === "confirmed" ? "確定" : o.status === "done" ? "お渡し済み" : o.status === "cancelled" ? "取り消し" : "来店なし"}</div>
       <div class="ptime">${esc(mainTime)}</div>
       ${countdownText(o) ? `<div>${countdownText(o)}</div>` : ""}
       <div style="font-weight:900;font-size:34px;letter-spacing:.05em;line-height:1.1;">注文番号 ${esc(orderCodeFromId(o.id))}</div>
@@ -594,11 +594,15 @@ function cardHtml(o) {
     </div>
     <div class="act-row">
       <button class="btn ghost" data-noshow="${o.id}">来店なし</button>
+      <button class="btn ghost danger" data-cancel="${o.id}">取り消し</button>
     </div>` : ""}
     ${o.status === "confirmed" ? `
     <div class="act-row">
       <button class="btn" data-done="${o.id}">お渡し済み</button>
       <button class="btn ghost" data-noshow="${o.id}">来店なし</button>
+    </div>
+    <div class="act-row">
+      <button class="btn ghost danger" data-cancel="${o.id}">取り消し</button>
     </div>` : ""}
   </div>`;
 }
@@ -673,6 +677,18 @@ function bindCardButtons() {
     await setDoc(doc(db, "blockedPhones", o.phone), {
       phone: o.phone, name: o.name, reason: "来店なし", createdAt: serverTimestamp(),
     });
+  }));
+  // 取り消し：電話で取り消し連絡を受けた場合などに使う正式な取り消し。
+  // 来店なしと違い、要注意リストには登録しない。枠はその場で空ける（冷凍は freeSlot が自動で何もしない）。
+  document.querySelectorAll("[data-cancel]").forEach(b => b.addEventListener("click", async () => {
+    const o = orders.find(x => x.id === b.dataset.cancel);
+    if (!o) return;
+    let msg = `${o.name} 様の注文を取り消しますか？取り消すと、この日時の枠が空いて他のお客様が注文できるようになります。`;
+    if (o.printedAt) msg += `\n※伝票は印刷済みです。厨房の伝票は破棄してください。`;
+    if (!confirm(msg)) return;
+    b.disabled = true;
+    await updateDoc(doc(db, "takeoutOrders", o.id), { status: "cancelled", cancelledAt: serverTimestamp() });
+    await freeSlot(o);
   }));
 }
 

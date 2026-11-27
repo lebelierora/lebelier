@@ -916,7 +916,8 @@ function statusChip(st) {
   return { pending: `<span class="status-chip status-pending">確認待ち</span>`,
            confirmed: `<span class="status-chip status-confirmed">確定</span>`,
            done: `<span class="status-chip status-done">お渡し済み</span>`,
-           noshow: `<span class="status-chip status-noshow">来店なし</span>` }[st] || st;
+           noshow: `<span class="status-chip status-noshow">来店なし</span>`,
+           cancelled: `<span class="status-chip status-cancelled">取り消し</span>` }[st] || st;
 }
 function showDone(docId, orderNo) {
   show("scr-done");
@@ -951,6 +952,9 @@ function showDone(docId, orderNo) {
       html += `<h2 style="margin:8px 0;">お渡し済みです。ありがとうございました</h2>`;
     } else if (o.status === "noshow") {
       html += `<h2 style="margin:8px 0;">このご注文は「来店なし」として処理されました</h2>
+        <p class="note">ご不明な点はお電話ください（0276-70-2321）。</p>`;
+    } else if (o.status === "cancelled") {
+      html += `<h2 style="margin:8px 0;">このご注文は取り消しになりました</h2>
         <p class="note">ご不明な点はお電話ください（0276-70-2321）。</p>`;
     }
     html += `<div style="margin-top:14px;"><div style="font-weight:800;">注文番号</div><div style="font-weight:900;font-size:40px;letter-spacing:.06em;line-height:1.15;">${esc(orderCodeFromId(docId))}</div></div>
