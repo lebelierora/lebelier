@@ -547,6 +547,67 @@ async function submitOrder() {
   }
 }
 
+// ---------- 注文状況の専用リンク（ブラウザ・端末が変わっても確認できる） ----------
+// 注文IDだけを含むURL。電話番号や名前は入れない。IDを知っている人だけが単体取得できる
+// （firestore.rules: takeoutOrders は get のみ全公開・list は厨房のみ）。
+const SITE_TOP_URL = "https://lebelierora.github.io/lebelier/";
+function statusUrlFor(id) { return `${SITE_TOP_URL}?order=${encodeURIComponent(id)}`; }
+async function copyTextToClipboard(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* フォールバックへ */ }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return !!ok;
+  } catch (e) { return false; }
+}
+// 完了画面の「注文状況の確認」欄：スクリーンショット1枚で受け取り予定とQRが残る形にする
+function renderDoneLink(docId, o) {
+  const box = $("done-link");
+  if (!box) return;
+  const url = statusUrlFor(docId);
+  // 受け取り日時は注文時点では「ご希望」。確定で変わる場合があるため断定表現にしない
+  const dateKey = o.pickupDate || o.requestedDate;
+  const dateStr = dateKey ? formatDateJP(dateKey).replace(/^\d+年/, "") : "";
+  const timeStr = o.requestedPickup || "";
+  let qrHtml = "";
+  try {
+    if (typeof qrcode === "function") {
+      const qr = qrcode(0, "M");
+      qr.addData(url);
+      qr.make();
+      qrHtml = qr.createSvgTag(4, 6);
+    }
+  } catch (e) { console.error(e); qrHtml = ""; }
+  box.innerHTML = `
+    <h2 style="margin:6px 0;">注文状況の確認</h2>
+    <p style="font-weight:900;font-size:18px;margin:8px 0;">この画面をスクリーンショットで保存してください</p>
+    <p class="note" style="margin:0 0 12px;">あとからでも、下のQRコード／リンクを開くと注文状況を確認できます（別のブラウザやスマホでも見られます）。</p>
+    <div style="font-weight:900;font-size:21px;line-height:1.55;">るべりえ<br>お受け取り予定：${esc(dateStr)}${timeStr ? ` ${esc(timeStr)}` : ""}</div>
+    <p class="note" style="margin:2px 0 10px;">※お受け取り日時はご希望です。お店の確定で変更になる場合があります</p>
+    ${qrHtml ? `<div style="margin:4px auto;">${qrHtml}</div>` : ""}
+    <div style="word-break:break-all;font-size:13px;margin:10px 0;">${esc(url)}</div>
+    <button class="btn" id="done-copy-link">リンクをコピー</button>
+    <p class="note" id="done-copy-msg" style="margin:8px 0 0;"></p>`;
+  box.classList.remove("hidden");
+  const svg = box.querySelector("svg");
+  if (svg) { svg.style.width = "180px"; svg.style.height = "180px"; }
+  $("done-copy-link").addEventListener("click", async () => {
+    const ok = await copyTextToClipboard(url);
+    $("done-copy-msg").textContent = ok ? "リンクをコピーしました" : "コピーできませんでした。上のリンクを長押ししてコピーしてください";
+  });
+}
+function clearDoneLink() {
+  const box = $("done-link");
+  if (!box) return;
+  box.classList.add("hidden");
+  box.innerHTML = "";
+  delete box.dataset.forId;
+}
+
 // ---------- 完了画面（ライブ更新） ----------
 function statusChip(st) {
   return { pending: `<span class="status-chip status-pending">確認待ち</span>`,
@@ -557,11 +618,15 @@ function statusChip(st) {
 function showDone(docId, orderNo) {
   show("scr-done");
   $("done-dinein-extra").classList.add("hidden");
+  clearDoneLink();
   if (dineinDoneUnsub) { dineinDoneUnsub(); dineinDoneUnsub = null; }
   if (doneUnsub) doneUnsub();
   doneUnsub = onSnapshot(doc(db, "takeoutOrders", docId), snap => {
     if (!snap.exists()) return;
     const o = snap.data();
+    // 専用リンク欄は注文ごとに1回だけ描く（状態更新のたびに描き直さない）
+    const linkBox = $("done-link");
+    if (linkBox && linkBox.dataset.forId !== docId) { renderDoneLink(docId, o); linkBox.dataset.forId = docId; }
     let html = `<div class="card" style="text-align:center;">`;
     if (o.kind === "frozen") html += `<p class="note" style="font-weight:900;font-size:16px;">冷凍ピザの店頭予約</p><div class="frozen-banner">🧊 ご来店の際は、保冷バッグと保冷剤をご持参ください（冷凍ピザのお持ち帰り用です）</div>`;
     if (o.kind === "frozen" && o.seal) html += `<p class="note" style="font-weight:800;">温め方のシール：${o.seal === "none" ? "不用（お付けしません）" : "必要"}</p>`;
@@ -609,7 +674,7 @@ function searchStatus() {
   }
   mine.forEach(m => {
     statusUnsubs.push(onSnapshot(doc(db, "takeoutOrders", m.id), snap => {
-      if (snap.exists()) { statusData[m.id] = snap.data(); renderStatusResults(); }
+      if (snap.exists()) { statusData[m.id] = { ...snap.data(), _id: m.id }; renderStatusResults(); }
     }, e => console.error(e)));
   });
 }
@@ -642,7 +707,13 @@ function renderStatusResults() {
           return `<div>${esc(i.name)} × ${i.qty}${custom ? `<span class="note">（${esc(custom)}）</span>` : ""}</div>`;
         }).join("")}</div>
         <div style="text-align:right;font-weight:900;margin-top:6px;">合計 ${yen(o.total)}</div>
+        <button class="btn ghost small" data-copy-link="${esc(o._id)}" style="margin-top:10px;">確認リンクをコピー</button>
       </div>`).join("");
+    $("status-results").querySelectorAll("[data-copy-link]").forEach(b =>
+      b.addEventListener("click", async () => {
+        const ok = await copyTextToClipboard(statusUrlFor(b.dataset.copyLink));
+        toast(ok ? "リンクをコピーしました" : "コピーできませんでした", 2500);
+      }));
 }
 
 // ---------- 店内オーダー ----------
@@ -744,6 +815,7 @@ async function submitDinein() {
 }
 function showDineinDone(docId, orderNo) {
   show("scr-done");
+  clearDoneLink(); // 専用リンクはテイクアウト・冷凍専用。店内では出さない
   $("done-dinein-extra").classList.remove("hidden");
   $("call-msg-done").textContent = "";
   if (doneUnsub) { doneUnsub(); doneUnsub = null; }
@@ -867,5 +939,32 @@ $("cartbar-btn").addEventListener("click", () => {
 });
 $("submit-order").addEventListener("click", submitOrder);
 updateCartbar(false);
+// 専用リンク（?order=注文ID）で開かれた場合は、その注文の状況を直接表示する。
+// 端末の記録が空でも（別のブラウザ・スマホでも）IDで単体取得して表示できる。
+const orderParam = new URLSearchParams(location.search).get("order");
+async function openLinkedOrder(id) {
+  show("scr-status");
+  $("status-results").innerHTML = `<div class="card"><p class="note" style="margin:0;">注文状況を読み込んでいます…</p></div>`;
+  try {
+    const snap = await getDoc(doc(db, "takeoutOrders", id));
+    if (!snap.exists()) throw new Error("not-found");
+    const o = snap.data();
+    // この端末の記録にも加えて、通常の注文状況表示（ライブ更新）に合流させる
+    try {
+      const mine = JSON.parse(localStorage.getItem("ruberie_my_orders") || "[]");
+      if (!mine.some(m => m.id === id)) {
+        mine.push({ id, orderNo: o.orderNo, pickupDate: o.pickupDate, requestedDate: o.requestedDate || o.pickupDate });
+        localStorage.setItem("ruberie_my_orders", JSON.stringify(mine.slice(-12)));
+      }
+    } catch (e) { /* 保存できなくても表示は続ける */ }
+    statusDate = o.pickupDate || o.requestedDate || todayKey();
+    renderDateChips($("status-date-chips"), statusDate, pickStatusDate);
+    searchStatus();
+  } catch (e) {
+    console.error(e);
+    $("status-results").innerHTML = `<div class="card"><p class="note" style="margin:0;">ご注文が見つかりませんでした。<br>お手数ですが、お電話でお問い合わせください（<a href="tel:0276702321">0276-70-2321</a>）</p></div>`;
+  }
+}
+if (orderParam) openLinkedOrder(orderParam);
 // 席別QR（?seat=）で開かれた場合は、その席で店内オーダーを直接開始する
 if (seatFixed) enterDinein();
