@@ -861,7 +861,15 @@ function showCheckout() {
   updateSetNotes();
   validatePickupAtCheckout();
 }
-function pickDate(k) { selDate = k; selTime = null; renderPickupDateChips(); renderSlots(); if (mode !== "frozen") watchSlots(); }
+function pickDate(k) {
+  selDate = k; selTime = null;
+  renderPickupDateChips(); renderSlots();
+  if (mode !== "frozen") watchSlots();
+  // 日付をタップで選んだときだけ、時刻セクションが見える位置まで自動スクロールする
+  // （初期表示や注文状況画面の日付チップでは発火しない。pickDate は日時選択画面の日付クリックからのみ呼ばれる）
+  const tf = $("time-field");
+  if (tf) requestAnimationFrame(() => tf.scrollIntoView({ behavior: "smooth", block: "start" }));
+}
 
 // ---------- 注文送信 ----------
 function makeOrderNo() {

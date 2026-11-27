@@ -110,6 +110,8 @@ a[href^="tel:"]{color:#1a6fb5;font-weight:700;text-decoration:underline;text-und
 
 /* 日時選択画面：確定ボタンを下部に固定する（他画面では section ごと hidden になる） */
 #scr-pickup{padding-bottom:110px;}
+/* 日付選択時の自動スクロール先（時刻セクション）が上端に張り付かないよう余白を持たせる */
+#time-field{scroll-margin-top:12px;}
 .pickup-proceed-bar{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--paper);border-top:2px solid var(--line);box-shadow:0 -4px 18px rgba(59,42,30,.12);padding:10px 14px calc(10px + env(safe-area-inset-bottom));}
 .pickup-proceed-bar .btn{max-width:692px;margin:0 auto;}
 
