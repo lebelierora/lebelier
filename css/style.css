@@ -151,7 +151,7 @@ a[href^="tel:"]{color:#1a6fb5;font-weight:700;text-decoration:underline;text-und
 @keyframes pop{50%{transform:scale(1.45);}}
 
 /* 商品詳細：写真を抑えて、最初の画面で商品名・価格・選択肢の始まりが見えるようにする */
-.detail-photo{width:100%;height:35vh;min-height:210px;max-height:360px;object-fit:cover;display:block;background:#f6efe3;}
+.detail-photo{width:100%;height:35vh;min-height:210px;max-height:360px;object-fit:contain;display:block;background:#f6efe3;}
 .detail-photo.contain{object-fit:contain;}
 .scroll-hint{padding:10px 14px;background:#fff3d6;color:#7a3e00;font-size:16px;font-weight:800;line-height:1.45;text-align:center;}
 .opt-group.attention{background:#fdedec;box-shadow:0 0 0 3px var(--warn);border-radius:12px;}
