@@ -45,12 +45,162 @@ let started = false;
 let startedDinein = false;
 let startedCalls = false;
 
+// ---------- 伝票印刷（PassPRNT） ----------
+// プリンター：スター精密 mC-Print3（TCP:192.168.11.40／80mm = size 576）。印刷は PassPRNT アプリ経由
+// （print-test.html の④ボタンと同じ方式・同じパラメータで実機確認済み）。
+// タイミング（本人の決定）：店内注文は注文が入った瞬間、テイクアウト・冷凍は厨房で確定した瞬間。呼び出しは印刷しない。
+// PassPRNT へ切り替わると戻りURLでこのページが再読み込みされるため、印刷済みフラグ（printedAt）を
+// 起動前に Firestore へ記録しておくことが二重印刷・ループ防止の要。
+const PRINTER_PORT = "TCP:192.168.11.40";
+const autoPrintAttempted = new Set(); // このページ表示中に自動印刷を試みた注文（メモリ上のループ防止）
+let printReturn = null;               // PassPRNT からの戻り情報 {code, message, kind, id}
+let printMsg = "";
+let printMsgOk = true;
+
+// PassPRNT の戻り（?printcb=kind:docId&passprnt_code=0&passprnt_message=SUCCESS）を読み取り、URLから消す。
+// コード体系は PassPRNT 公式マニュアル（iOS版 Data Specifications）：passprnt_code=0 が成功。
+(function readPrintReturn() {
+  try {
+    const q = new URLSearchParams(location.search);
+    if (!q.has("passprnt_code")) return;
+    const [kind, id] = (q.get("printcb") || "").split(":");
+    printReturn = { code: q.get("passprnt_code"), message: q.get("passprnt_message") || "", kind, id };
+    history.replaceState(null, "", location.pathname);
+  } catch (e) { console.error(e); }
+})();
+
+function showPrintMsg() {
+  const el = $("print-msg");
+  if (!el || !printMsg) return;
+  el.textContent = printMsg;
+  el.classList.toggle("fail", !printMsgOk);
+  el.classList.remove("hidden");
+}
+
+// 戻ってきた印刷結果を画面に表示し、失敗なら注文ドキュメントにも printStatus=failed を残す
+async function handlePrintReturn() {
+  if (!printReturn) return;
+  const r = printReturn;
+  printReturn = null;
+  printMsgOk = r.code === "0";
+  printMsg = printMsgOk
+    ? "🖨 伝票を印刷しました"
+    : `⚠ 伝票の印刷に失敗しました${r.message ? `（${r.message}）` : ""}。注文カードの「伝票を再印刷」ボタンで出し直せます。`;
+  showPrintMsg();
+  if (r.id && (r.kind === "dinein" || r.kind === "takeout")) {
+    try {
+      await updateDoc(doc(db, r.kind === "dinein" ? "dineInOrders" : "takeoutOrders", r.id),
+        { printStatus: printMsgOk ? "printed" : "failed" });
+    } catch (e) { console.error("印刷結果の記録に失敗", e); }
+  }
+}
+
+// 伝票（PassPRNT用HTML・80mm）。項目・選択肢の並べ方は厨房カードの itemsHtml と同じルール。
+function ticketItemsHtml(o) {
+  return (o.items || []).map(i => {
+    const custom = [i.cut ? (i.cut === "cut4" ? "4カット" : i.cut === "cut6" ? "6カット" : "未カット") : null,
+                    i.pack ? (i.pack === "box" ? "箱" : "紙皿・ホイル") : null,
+                    i.choice || null,
+                    ...(i.toppings || [])].filter(Boolean).join("／");
+    const timing = (i.timing && i.timing !== "すぐ提供" && i.timing !== "できた順")
+      ? `<div style="font-size:20px;font-weight:bold;">提供：${esc(i.timing)}</div>` : "";
+    return `<div style="font-size:22px;font-weight:bold;">${esc(i.name)} × ${i.qty}</div>` +
+      (custom ? `<div style="font-size:19px;">${esc(custom)}</div>` : "") + timing;
+  }).join("");
+}
+function buildTicketHtml(kind, o) {
+  let head, sub;
+  if (kind === "dinein") {
+    head = "店内注文";
+    sub = esc(o.seatLabel || seatLabel(o.seat));
+  } else if (o.kind === "frozen") {
+    head = "冷凍";
+    sub = `受け取り ${esc(formatDateJP(o.confirmedDate || o.pickupDate))} ${esc(o.confirmedPickup || o.requestedPickup || "")}`;
+  } else {
+    head = "テイクアウト";
+    sub = `受け取り ${esc(formatDateJP(o.pickupDate))} ${esc(o.confirmedPickup || o.requestedPickup || "")}`;
+  }
+  const dineinTime = tsSortKey(o.createdAt);
+  return '<html><head><meta charset="utf-8"><meta name="format-detection" content="telephone=no"></head><body style="font-family:sans-serif;">' +
+    '<div style="text-align:center;font-size:26px;font-weight:bold;">るべりえ</div>' +
+    `<div style="text-align:center;font-size:30px;font-weight:bold;">${head}</div>` +
+    `<div style="text-align:center;font-size:26px;font-weight:bold;">${sub}</div>` +
+    '<hr>' +
+    (kind === "dinein"
+      ? `<div style="font-size:20px;">注文番号 ${esc(o.orderNo || "")}${dineinTime.startsWith("9999") ? "" : `／注文時刻 ${esc(dineinTime.slice(11))}`}</div>`
+      : `<div style="font-size:22px;font-weight:bold;">${esc(o.name || "")} 様</div><div style="font-size:20px;">注文番号 ${esc(o.orderNo || "")}</div>`) +
+    ticketItemsHtml(o) +
+    (o.setMeal ? '<div style="font-size:20px;font-weight:bold;">平日セット対象：揚げ物をサービスで付ける</div>' : "") +
+    (o.note ? `<div style="font-size:20px;">備考：${esc(o.note)}</div>` : "") +
+    (o.kind === "frozen" && o.seal ? `<div style="font-size:20px;font-weight:bold;">温め方シール：${o.seal === "none" ? "不要（貼らない）" : "必要（各商品に貼る）"}</div>` : "") +
+    '<hr>' +
+    `<div style="font-size:24px;font-weight:bold;">合計 ${yen(o.total)}</div>` +
+    '</body></html>';
+}
+
+// PassPRNT を起動して伝票を出す。isAuto=true の自動印刷は「printedAt 未記録」の注文に1回だけ。
+async function launchPrint(kind, o, isAuto) {
+  const coll = kind === "dinein" ? "dineInOrders" : "takeoutOrders";
+  const skey = `passprnt-launched:${kind}:${o.id}`;
+  if (isAuto) {
+    if (o.printedAt || autoPrintAttempted.has(o.id)) return false;
+    try { if (sessionStorage.getItem(skey)) return false; } catch (e) {}
+  }
+  autoPrintAttempted.add(o.id);
+  try { sessionStorage.setItem(skey, "1"); } catch (e) {}
+  try {
+    // 起動前に印刷済みフラグを記録する（戻り時の再読み込みで再び自動印刷しないため）
+    await updateDoc(doc(db, coll, o.id), {
+      printedAt: serverTimestamp(), printStatus: "sent", printCount: (o.printCount || 0) + 1,
+    });
+  } catch (e) {
+    console.error("印刷フラグの記録に失敗", e);
+    if (isAuto) return false; // フラグが書けないまま出すとループしかねないので自動は中止（手動ボタンで出せる）
+  }
+  const back = location.origin + location.pathname + "?printcb=" + encodeURIComponent(kind + ":" + o.id);
+  const uri = "starpassprnt://v1/print/nopreview?" +
+    "back=" + encodeURIComponent(back) +
+    "&html=" + encodeURIComponent(buildTicketHtml(kind, o)) +
+    "&size=576" +
+    "&port=" + encodeURIComponent(PRINTER_PORT);
+  window.location.href = uri;
+  return true;
+}
+
+// 店内注文の自動印刷：未印刷の確認待ちがあれば、来た順に1件だけ試みる
+// （PassPRNTから戻るたびにページが再読み込みされ、次の1件が対象になる）
+function maybeAutoPrintDinein() {
+  const target = dineinOrders
+    .filter(o => o.status === "pending" && !o.printedAt)
+    .sort((a, b) => tsMillis(a.createdAt) - tsMillis(b.createdAt))[0];
+  if (target) launchPrint("dinein", target, true);
+}
+
+// カード内の印刷まわり（失敗警告／店内の大きな印刷ボタン／再印刷ボタン）
+function printBlockHtml(kind, o) {
+  const warn = o.printStatus === "failed" ? `<div class="print-warn">⚠ 印刷できていません</div>` : "";
+  const big = kind === "dinein" && o.status === "pending" && !o.printedAt
+    ? `<div class="act-row"><button class="print-flash-btn" data-print="${kind}|${o.id}">🖨 伝票を印刷</button></div>` : "";
+  const re = `<div class="act-row"><button class="btn ghost" data-print="${kind}|${o.id}">${o.printedAt ? "伝票を再印刷" : "伝票を印刷"}</button></div>`;
+  return warn + big + re;
+}
+function bindPrintButtons() {
+  document.querySelectorAll("[data-print]").forEach(b => b.addEventListener("click", async () => {
+    const [kind, id] = b.dataset.print.split("|");
+    const o = (kind === "dinein" ? dineinOrders : orders).find(x => x.id === id);
+    if (!o) return;
+    b.disabled = true;
+    await launchPrint(kind, o, false);
+  }));
+}
+
 function openKitchen() {
   if (kitchenOpen) return;
   kitchenOpen = true;
   $("pin-gate").classList.add("hidden");
   $("kitchen-main").classList.remove("hidden");
   startListeners();
+  handlePrintReturn();
 }
 
 // ---------- 受け取り枠（daySlots）の保守 ----------
@@ -92,6 +242,7 @@ function startListeners() {
     knownDineinPending = pendingIds;
     startedDinein = true;
     render();
+    maybeAutoPrintDinein(); // 店内注文は入った瞬間に伝票を出す
   });
   onSnapshot(query(collection(db, "calls"), where("status", "==", "open")), snap => {
     calls = snap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -245,6 +396,7 @@ function render() {
   $("finished-list").innerHTML = displayFinished().map(e => e.kind === "takeout" ? cardHtml(e.o) : dineinCardHtml(e.o)).join("");
   bindCardButtons();
   bindDineinButtons();
+  bindPrintButtons();
 }
 
 // ---------- 店内オーダーのカード ----------
@@ -258,6 +410,7 @@ function dineinCardHtml(o) {
     </div>
     <div>${itemsHtml(o)}</div>
     <div class="ktotal">合計 ${yen(o.total)}</div>
+    ${printBlockHtml("dinein", o)}
     ${isPending ? `
     <div class="act-row">
       <button class="btn" data-daccept="${o.id}">受付する</button>
@@ -340,6 +493,7 @@ function cardHtml(o) {
     ${o.kind === "frozen" && o.seal ? `<div class="kcustom" style="font-weight:900;${o.seal === "none" ? "color:#c0392b;" : ""}">温め方シール：${o.seal === "none" ? "不要（貼らない）" : "必要（各商品に貼る）"}</div>` : ""}
     <div>${itemsHtml(o)}</div>
     <div class="ktotal">合計 ${yen(o.total)}</div>
+    ${printBlockHtml("takeout", o)}
     ${isPending ? `
     <div>
       <div class="kcustom">お客様の希望：${esc(o.requestedPickup)}</div>
@@ -422,6 +576,11 @@ function bindCardButtons() {
         await freeSlot(o);
         await takeSlot(o, newDate, upd.confirmedPickup);
       }
+    }
+    // 確定した瞬間に伝票を印刷する（テイクアウト・冷凍共通、初回のみ。伝票には確定時刻を使う）
+    if (!o.printedAt) {
+      const confirmedOrder = { ...o, ...upd, pickupDate: upd.pickupDate || o.pickupDate };
+      launchPrint("takeout", confirmedOrder, true);
     }
   }));
   document.querySelectorAll("[data-done]").forEach(b => b.addEventListener("click", async () => {
