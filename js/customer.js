@@ -95,10 +95,10 @@ function updateHeader() {
     $("page-sub").textContent = "創作ピザとスイーツのお店 るべりえ（群馬県邑楽町）／お席からご注文いただけます。お会計はお帰りの際にレジでお願いします";
   } else if (mode === "frozen") {
     $("page-title").textContent = "るべりえ 冷凍ピザ店頭予約";
-    $("page-sub").textContent = `冷凍ピザの店頭受け取り予約です。受け取りは翌々日から${formatDateJP(bookingEndKey())}まで／お支払いは受け取り時にレジでお願いします（現金・PayPay・コハクペイ等）`;
+    $("page-sub").textContent = `冷凍ピザの店頭受け取り予約です。受け取りは翌々日から${formatDateJP(bookingEndKey())}まで／お支払いは受け取り時にレジでお願いします（現金・クレジット・PayPay・コハクペイ等）`;
   } else {
     $("page-title").textContent = "るべりえ テイクアウト注文";
-    $("page-sub").textContent = "創作ピザとスイーツのお店 るべりえ（群馬県邑楽町）／お支払いは受け取り時にレジでお願いします（現金・PayPay・コハクペイ等）";
+    $("page-sub").textContent = "創作ピザとスイーツのお店 るべりえ（群馬県邑楽町）／お支払いは受け取り時にレジでお願いします（現金・クレジット・PayPay・コハクペイ等）";
   }
 }
 
