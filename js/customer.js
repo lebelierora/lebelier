@@ -8,10 +8,10 @@ import {
   todayKey, addDays, formatDateJP, isClosedDay, closedReason, timeSlots, leadMinutes,
   normalizePhone, esc, yen, SEATS, seatLabel, toMin, bookingEndKey, advanceGate,
   AGE_FESTIVAL, isAgeFestival, earlyMenuVisible,
-} from "./menu.js?v=20251127-116";
+} from "./menu.js?v=20251127-117";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
-} from "./frozen-menu.js?v=20251127-114";
+} from "./frozen-menu.js?v=20251127-115";
 
 // 焼きピザ・冷凍ピザ両方のメニューから商品を引く
 const anyById = id => menuById(id) || frozenById(id);
@@ -440,8 +440,20 @@ function renderDetail() {
   if (hasCutPack(it) && mode === "takeout") selectableNames.push("包装"); // 包装はテイクアウトのみ
   // choice の見出し名は末尾の「をお選びください」を落とした短い形にする（例：「チーズの量をお選びください」→「チーズの量」）
   if (choiceVisible && visibleOptions.length > 0) selectableNames.push(String(it.choice.label || "").replace(/をお選びください$/, ""));
-  if ((it.toppings || []).some(t => (mode === "dinein" || !t.dineInOnly) && (!t.onlyChoice || effChoice === t.onlyChoice))) selectableNames.push("トッピング");
+  // トッピングの選択肢がすべて「〜抜き」だけの商品は、グループ名「トッピング」でなく実際の選択肢名で案内する
+  // （例：暴れん坊帆立カレーはトッピングではなく「ハバネロ抜き」を選ぶ商品。本人の実機指摘 2026-11-27）
+  const hintToppings = (it.toppings || []).filter(t => (mode === "dinein" || !t.dineInOnly) && (!t.onlyChoice || effChoice === t.onlyChoice));
+  let nukiNameIdx = -1, nukiMulti = false;
+  if (hintToppings.length) {
+    if (hintToppings.every(t => t.label.endsWith("抜き"))) {
+      selectableNames.push(hintToppings[0].label);
+      nukiNameIdx = selectableNames.length - 1;
+      nukiMulti = hintToppings.length > 1;
+    } else selectableNames.push("トッピング");
+  }
   if (timingOptions(it)) selectableNames.push("タイミング"); // 見出しは「提供のタイミング」のまま、案内文の中では短く呼ぶ
+  // 「抜き」が唯一の選択グループで複数ある場合だけ「〜など」とする（他のグループと並ぶ場合は末尾の「などを選べます」で足りる）
+  if (nukiNameIdx >= 0 && nukiMulti && selectableNames.length === 1) selectableNames[nukiNameIdx] += "など";
   const hasSelectable = selectableNames.length > 0;
   const detailHintText = selectableNames.length > 1
     ? `↓ 下で、${selectableNames.join("・")}などを選べます`
