@@ -69,6 +69,15 @@
   .stop-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px;}
   .stop-row .stop-label{font-weight:900;font-size:17px;}
   #stop-btn.stopped{background:#c0392b;color:#fff;border-color:#c0392b;}
+  .stats-panel{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:12px;}
+  .stats-title{font-weight:900;font-size:17px;margin-bottom:6px;}
+  .stats-table{width:100%;border-collapse:collapse;font-size:15px;}
+  .stats-table th,.stats-table td{padding:4px 6px;text-align:right;border-top:1px solid var(--line);white-space:nowrap;}
+  .stats-table thead th{border-top:none;color:var(--muted);font-size:13px;}
+  .stats-table th.rowh{text-align:left;font-weight:900;}
+  .stats-table td .amt{display:block;font-size:13px;color:var(--muted);font-weight:700;}
+  .stats-sub{font-size:13px;color:var(--muted);font-weight:700;margin-top:6px;line-height:1.5;}
+  .stats-note{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5;}
   </style>
 </head>
 <body>
@@ -104,6 +113,11 @@
   <div class="stop-row">
     <span class="stop-label">本日のテイクアウト受付：</span>
     <button class="btn ghost small" id="stop-btn" type="button">本日のテイクアウト受付を止める</button>
+  </div>
+  <div class="stats-panel" id="stats-panel">
+    <div class="stats-title">📊 注文集計</div>
+    <div id="stats-body"><span class="note">集計中…</span></div>
+    <div class="stats-note">注文件数＝キャンセル以外の件数／金額＝お渡し済み（店内は提供済み）の合計です。テイクアウト・冷凍は受け取り日、店内は注文日で数えています。早割・来店なし・キャンセルはテイクアウト＋冷凍の合算です。</div>
   </div>
   <div class="tabs" id="kind-tabs" style="margin-top:4px;">
     <button data-tab="all" class="active">すべて</button>
@@ -152,6 +166,6 @@
 <audio id="order-sound" src="audio/moko-order-v2.mp3" preload="auto"></audio>
 <audio id="call-sound" src="audio/moko-call-v2.mp3" preload="auto"></audio>
 
-<script type="module" src="js/kitchen.js?v=20251127-116"></script>
+<script type="module" src="js/kitchen.js?v=20251127-117"></script>
 </body>
 </html>

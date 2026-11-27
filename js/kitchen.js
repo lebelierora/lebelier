@@ -467,6 +467,69 @@ function render() {
   bindCardButtons();
   bindDineinButtons();
   bindPrintButtons();
+  renderStats();
+}
+
+// ==== 注文集計（純粋計算） STATS-LOGIC-BEGIN ====
+// 追加の通信は一切せず、厨房が読み込み済みの注文データをメモリ上で数えるだけ。
+// 日付はJSTの日付キー（YYYY-MM-DD）で判定する。
+function statsJstKey(date) {
+  if (!date) return "";
+  const parts = {};
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  for (const p of fmt.formatToParts(date)) parts[p.type] = p.value;
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+// periods: [{label, test(key)->bool}]。orders=takeoutOrders、dineinOrders=店内注文。
+function computeStats(takeoutList, dineinList, periods) {
+  const blank = () => ({ n: 0, amt: 0 });
+  const rows = periods.map(p => ({
+    label: p.label, test: p.test,
+    takeout: blank(), frozen: blank(), dinein: blank(), total: blank(),
+    early: 0, noshow: 0, cancelled: 0,
+  }));
+  const add = (row, cat, o) => {
+    if (o.status === "cancelled") { if (cat !== "dinein") row.cancelled++; return; }
+    row[cat].n++; row.total.n++;
+    if (o.status === "done") {
+      const t = Number(o.total) || 0;
+      row[cat].amt += t; row.total.amt += t;
+    }
+    if (cat !== "dinein") {
+      if (o.status === "noshow") row.noshow++;
+      if ((o.items || []).some(i => String(i.name || "").includes("早割"))) row.early++;
+    }
+  };
+  for (const o of takeoutList || []) {
+    const key = o.confirmedDate || o.pickupDate || "";
+    const cat = o.kind === "frozen" ? "frozen" : "takeout";
+    for (const row of rows) if (row.test(key)) add(row, cat, o);
+  }
+  for (const o of dineinList || []) {
+    const key = o.createdAt && o.createdAt.toDate ? statsJstKey(o.createdAt.toDate()) : "";
+    for (const row of rows) if (row.test(key)) add(row, "dinein", o);
+  }
+  return rows.map(({ test, ...rest }) => rest);
+}
+// ==== STATS-LOGIC-END ====
+
+function renderStats() {
+  const body = $("stats-body");
+  if (!body) return;
+  const tk = todayKey();
+  const mo = tk.slice(0, 7); // YYYY-MM
+  const periods = [
+    { label: "今日", test: k => k === tk },
+    { label: "今月", test: k => !!k && k.startsWith(mo) },
+    { label: "累計", test: () => true },
+  ];
+  const rows = computeStats(orders, dineinOrders, periods);
+  const cell = c => `${c.n}件<span class="amt">${yen(c.amt)}</span>`;
+  const trs = rows.map(r => `<tr><th class="rowh">${r.label}</th><td>${cell(r.takeout)}</td><td>${cell(r.frozen)}</td><td>${cell(r.dinein)}</td><td>${cell(r.total)}</td></tr>`).join("");
+  const subs = rows.map(r => `${r.label}：早割 ${r.early}件・来店なし ${r.noshow}件・キャンセル ${r.cancelled}件`).join("<br>");
+  body.innerHTML = `<table class="stats-table"><thead><tr><th></th><th>テイクアウト</th><th>冷凍</th><th>店内</th><th>合計</th></tr></thead><tbody>${trs}</tbody></table><div class="stats-sub">${subs}</div>`;
 }
 
 // ---------- 店内オーダーのカード ----------
