@@ -40,7 +40,7 @@ button:disabled { opacity: 0.5;}
 <h2>テスト印刷</h2>
 <button class="btn-http" id="btnHttp">① WebPRNTでテスト印刷（http）</button>
 <button class="btn-https" id="btnHttps">② WebPRNTでテスト印刷（https）</button>
-<button class="btn-status" id="btnStatus">③ プリンターの状態だけ確認</button>
+<button class="btn-status" id="btnStatus">③ プリンターの状態だけ確認（https）</button>
 <button class="btn-passprnt" id="btnPassprnt">④ PassPRNTアプリで印刷（試験用）</button>
 <p class="small">④は、iPadに「PassPRNT」アプリが入っている場合だけ動く予備の方法です（試験用）。</p>
 </div>
@@ -158,7 +158,7 @@ return parts;
 function sendWebPrnt(scheme, mode, btn) {
 var ip = getIp();
 if (!ip) { showResult('IPアドレスが空です', false, 'プリンターのIPアドレスを入力してください。'); return;}
-var url = scheme + '://' + ip + '/StarWebPRNT/SendMessage/';
+var url = scheme + '://' + ip + '/StarWebPRNT/SendMessage';
 var label = (mode === 'status'? '状態確認': 'テスト印刷') + '（' + scheme + '）';
 btn.disabled = true;
 latestEl.textContent = '送信中…（最大20秒ほど待ちます）';
@@ -269,7 +269,7 @@ window.location.href = uri;
 
 document.getElementById('btnHttp').addEventListener('click', function () { sendWebPrnt('http', 'print', this);});
 document.getElementById('btnHttps').addEventListener('click', function () { sendWebPrnt('https', 'print', this);});
-document.getElementById('btnStatus').addEventListener('click', function () { sendWebPrnt('http', 'status', this);});
+document.getElementById('btnStatus').addEventListener('click', function () { sendWebPrnt('https', 'status', this);});
 document.getElementById('btnPassprnt').addEventListener('click', function () { printViaPassPrnt();});
 document.getElementById('btnCopy').addEventListener('click', function () {
 var text = resultEl.textContent;
