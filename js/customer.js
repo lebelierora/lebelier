@@ -829,6 +829,13 @@ $("seat-back").addEventListener("click", () => { setMode("takeout"); show("scr-h
 $("dinein-back").addEventListener("click", () => show("scr-order"));
 $("submit-dinein").addEventListener("click", submitDinein);
 $("call-btn-order").addEventListener("click", () => openCallModal($("call-msg-order")));
+// 店内→テイクアウトへの一方向リンク（店内バーの中だけに置く。逆向きの入口は作らない）
+// カートはモード別にメモリ保持で永続化されないため、移動（再読み込み）で店内カートは消える。
+// 店内限定商品がテイクアウト注文に混ざることはないが、カートが空になることだけ事前に確認する。
+$("to-takeout").addEventListener("click", e => {
+  const q = carts.dinein.reduce((a, c) => a + c.qty, 0);
+  if (q > 0 && !confirm("テイクアウトのページへ移動すると、店内オーダーのカートは空になります。移動しますか？")) e.preventDefault();
+});
 $("call-btn-checkout").addEventListener("click", () => openCallModal($("call-msg-checkout")));
 $("call-btn-done").addEventListener("click", () => openCallModal($("call-msg-done")));
 $("call-cancel").addEventListener("click", () => $("call-modal").classList.add("hidden"));
