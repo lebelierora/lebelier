@@ -7,8 +7,8 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isClosedDay, closedReason, timeSlots, leadMinutes,
   normalizePhone, esc, yen, SEATS, seatLabel, toMin, bookingEndKey, advanceGate,
-  AGE_FESTIVAL, isAgeFestival,
-} from "./menu.js?v=20251127-114";
+  AGE_FESTIVAL, isAgeFestival, earlyMenuVisible,
+} from "./menu.js?v=20251127-115";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
 } from "./frozen-menu.js?v=20251127-112";
@@ -149,9 +149,15 @@ function catLabel(c) {
   return c.id === AGE_FESTIVAL.cat && isAgeFestival(todayKey()) ? AGE_FESTIVAL.name : c.name;
 }
 function renderTabs() {
-  const cats = mode === "frozen" ? FROZEN_CATEGORIES : CATEGORIES.filter(c => !c.hidden && (mode === "dinein" || !c.dineInOnly)); // dineInOnly のカテゴリ（スイーツ）は店内のみ
+  // dineInOnly のカテゴリ（スイーツ）は店内のみ／takeoutOnly のカテゴリ（早割メニュー）はテイクアウトのみ。
+  // 早割メニューは受付開始日（2026-11-30）より前はタブ自体を出さない。
+  const cats = mode === "frozen" ? FROZEN_CATEGORIES : CATEGORIES.filter(c => !c.hidden
+    && (mode === "dinein" || !c.dineInOnly)
+    && (mode === "takeout" || !c.takeoutOnly)
+    && (c.id !== "early" || earlyMenuVisible(todayKey())));
+  if (!cats.some(c => c.id === currentCat)) currentCat = cats.length ? cats[0].id : currentCat; // 表示できないカテゴリが選択中なら先頭へ
   $("cat-tabs").innerHTML = cats.map(c =>
-    `<button data-cat="${c.id}" class="${c.id === currentCat ? "active" : ""}">${esc(catLabel(c))}</button>`).join("");
+    `<button data-cat="${c.id}" class="${c.id === currentCat ? "active" : ""}${c.id === "early" ? " early-pill" : ""}">${esc(catLabel(c))}</button>`).join("");
   $("cat-tabs").querySelectorAll("button").forEach(b =>
     b.addEventListener("click", () => { currentCat = b.dataset.cat; renderTabs(); renderGrid(); }));
 }
@@ -186,8 +192,11 @@ function renderGrid() {
     .filter(m => !m.hidden && (mode === "dinein" || !m.dineInOnly) && (mode === "takeout" || !m.takeoutOnly)) // dineInOnly は店内のみ／takeoutOnly はテイクアウトのみ／hidden は常に出さない
     .filter(m => advanceStateOf(m) !== "hidden") // 早割商品は受付開始日より前は出さない
     .filter(m => !untilHidden(m)); // 販売終了日を過ぎた受け取り日では出さない
+  // 早割メニューではポスターを大きく見せるため、1列の大型カードにする（サイドメニューでは通常サイズのまま）
+  const earlyView = mode === "takeout" && currentCat === "early";
+  $("item-grid").classList.toggle("wide", earlyView);
   $("item-grid").innerHTML = items.map(m => `
-    <button class="item" data-id="${m.id}">
+    <button class="item${earlyView ? " large" : ""}" data-id="${m.id}">
       ${effImg(m) ? `<img src="${esc(effImg(m))}" alt="${esc(m.name)}" loading="lazy"${m.poster ? ` style="object-fit:contain;background:#f6efe3;"` : ""}>` : (m.img ? "" : `<div class="noimg">写真なし</div>`)}
       <div class="body">
         <div class="name">${esc(m.name)}${m.seasonal ? ` <span class="season-badge">季節</span>` : ""}${m.eatInBadge ? ` <span class="eatin-badge">イートイン限定</span>` : ""}${festivalOn && m.cat === AGE_FESTIVAL.cat ? ` <span class="festival-badge">期間限定</span>` : ""}</div>
@@ -1281,7 +1290,7 @@ document.querySelectorAll(".guide-toggle").forEach(btn => {
 });
 
 $("go-order").addEventListener("click", () => {
-  setMode("takeout"); currentCat = "seasonal";
+  setMode("takeout"); currentCat = earlyMenuVisible(todayKey()) ? "early" : "seasonal"; // 早割受付中は早割メニューを最初に開く（一番目立たせる）
   // 日時が選択済みならそのままメニューへ。未選択なら最初に日時を選んでもらう
   if (pickupSel.takeout.time) { updatePickupBar(); renderTabs(); renderGrid(); show("scr-order"); }
   else startPickupFlow("menu");

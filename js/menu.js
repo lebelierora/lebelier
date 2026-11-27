@@ -7,6 +7,7 @@
 // 写真は店内版診断マスターから、品名が一致する品のみ流用。
 
 export const CATEGORIES = [
+  { id: "early", name: "早割メニュー", takeoutOnly: true }, // 仮想カテゴリ：advanceOnly 商品を先頭に大きく見せる（本人指示 2026-11-27）。表示条件は customer.js 側（受付開始日以降・テイクアウトのみ）
   { id: "seasonal", name: "季節メニュー" },
   { id: "hall", name: "ホールピザ" },
   { id: "age", name: "揚げピザ" },
@@ -94,8 +95,8 @@ export const MENU = [
   { id: "age-moriawase", cat: "side", name: "揚げ物盛り合わせ", img: "images/age-moriawase.jpg", imgDineIn: "images/age-moriawase-dinein.jpg", price: 700, desc: "ゼッポレ9粒・皮付きじゃがいもの素揚げ６本クリスピーチキン3個入ってます。・特定原材料 (一部に豚肉・小麦・乳成分・卵・牛肉・大豆・鶏肉を含む) ※厨房ではえび・かにを含む製品を製造しています。", toppings: [] },
   { id: "ham-moriawase", cat: "side", name: "ハム盛り合わせ", img: "images/ham-moriawase.jpg", imgDineIn: "images/ham-moriawase-dinein.jpg", price: 1600, desc: "プロシュート・コッパ・スペック・ミラノサラミ・スモークチキンの盛り合わせです。・特定原材料 (一部に豚肉・鶏肉を含む) ※厨房ではえび・かにを含む製品を製造しています。", toppings: [] },
   { id: "party-set", cat: "side", name: "パーティーセット", img: "images/party-set.jpg", price: 2900, desc: "ハム盛り合わせ・パーティーるべりえチキン・ゼッポレ・じゃがいもの素揚げ粉チーズのセットです。・特定原材料 (一部に豚肉・小麦・乳成分・卵・豚肉・牛肉・大豆・鶏肉を含む) ※厨房ではえび・かにを含む製品を製造しています。", toppings: [{ label: "パーティーるべりえチキンピリ辛に変更", delta: 50 }] },
-  { id: "party-set-early", cat: "side", name: "パーティーセット（早割）", img: "images/party-set.jpg", price: 2750, takeoutOnly: true, advanceOnly: true, fromDate: "2026-11-30", desc: "【早割・前日までのご予約専用】ハム盛り合わせ・パーティーるべりえチキン・ゼッポレ・じゃがいもの素揚げ粉チーズのセットです。前日までにご予約いただくと、通常価格よりお得な早割価格でご用意します。当日の受け取りではご注文いただけません。・特定原材料 (一部に豚肉・小麦・乳成分・卵・豚肉・牛肉・大豆・鶏肉を含む) ※厨房ではえび・かにを含む製品を製造しています。", toppings: [{ label: "パーティーるべりえチキン用ピリ辛パウダー別添", delta: 50 }] },
-  { id: "party-chicken-early", cat: "side", name: "パーティーるべりえチキン（早割）", img: "images/crispy-chicken.jpg", price: 850, takeoutOnly: true, advanceOnly: true, fromDate: "2026-11-30", desc: "【早割・前日までのご予約専用】国産鶏胸肉を使用した自家製クリスピーチキンのパーティーサイズ（10〜12個）です。サクサク食感がたまらないビールのお供にもオススメです。前日までにご予約いただくと、通常のパーティーサイズよりお得な早割価格でご用意します。当日の受け取りではご注文いただけません。・特定原材料 (一部に豚肉・小麦・乳成分・卵・牛肉・大豆・鶏肉を含む) ※厨房ではえび・かにを含む製品を製造しています。", toppings: [{ label: "ピリ辛パウダー別添", delta: 50 }] },
+  { id: "party-set-early", cat: "side", name: "パーティーセット（早割）", img: "images/party-set-early.jpg", poster: true, price: 2750, takeoutOnly: true, advanceOnly: true, fromDate: "2026-11-30", desc: "【早割・前日までのご予約専用】ハム盛り合わせ・パーティーるべりえチキン・ゼッポレ・じゃがいもの素揚げ粉チーズのセットです。前日までにご予約いただくと、通常価格よりお得な早割価格でご用意します。当日の受け取りではご注文いただけません。・特定原材料 (一部に豚肉・小麦・乳成分・卵・豚肉・牛肉・大豆・鶏肉を含む) ※厨房ではえび・かにを含む製品を製造しています。", toppings: [{ label: "パーティーるべりえチキン用ピリ辛パウダー別添", delta: 50 }] },
+  { id: "party-chicken-early", cat: "side", name: "パーティーるべりえチキン（早割）", img: "images/party-chicken-early.jpg", poster: true, price: 850, takeoutOnly: true, advanceOnly: true, fromDate: "2026-11-30", desc: "【早割・前日までのご予約専用】国産鶏胸肉を使用した自家製クリスピーチキンのパーティーサイズ（10〜12個）です。サクサク食感がたまらないビールのお供にもオススメです。前日までにご予約いただくと、通常のパーティーサイズよりお得な早割価格でご用意します。当日の受け取りではご注文いただけません。・特定原材料 (一部に豚肉・小麦・乳成分・卵・牛肉・大豆・鶏肉を含む) ※厨房ではえび・かにを含む製品を製造しています。", toppings: [{ label: "ピリ辛パウダー別添", delta: 50 }] },
   { id: "takunomi-set", cat: "side", name: "宅飲み！！るべりえセット", img: "images/takunomi-set.jpg", price: 1300, takeoutOnly: true, desc: "ハートランド生ビール・ゼッポレ・もつトマト煮込みのセットです。※生ビールは御来店頂いてからご用意はじめます。もつトマト煮込みはテイクアウトはコーヒーカップに入れて提供致します。・特定原材料 (一部に豚肉・小麦・乳成分・牛肉・大豆・鶏肉を含む) ※厨房では卵・えび・かにを含む製品を製造しています。", descDineIn: "ハートランド生ビール・ゼッポレ・もつトマト煮込みのセットです。※生ビールは御来店頂いてからご用意はじめます。・特定原材料 (一部に豚肉・小麦・乳成分・牛肉・大豆・鶏肉を含む) ※厨房では卵・えび・かにを含む製品を製造しています。", toppings: [] },
   { id: "green-olive", cat: "side", name: "グリーンオリーブ種あり", img: "images/green-olive.jpg", price: 330, desc: "グリーンオリーブ種ありです。", toppings: [] },
   { id: "pickles", cat: "side", name: "ピクルス", img: "images/pickles.jpg", price: 330, desc: "群馬県産きゅうりのピクルスです。", toppings: [] },
@@ -162,9 +163,11 @@ export const MENU = [
   { id: "fig-anko-tiramisu", cat: "sweetage", name: "イチジクあんティラミス", price: 480, desc: "邑楽町産無花果のセミドライとつぶあん。マスカルポーネとコーヒーソース・マルサラ酒を群馬県産小麦100%のピザ生地で包んで揚げました。キャノーラ油でカラッと揚げているので、そこまで油感なく召し上がれます。※油物が苦手、受け付けない方は御遠慮ください。・特定原材料 (一部に小麦・乳成分・大豆を含む) ※厨房では卵・えび・かにを含む製品を製造しています。", img: "images/fig-anko-tiramisu.jpg", toppings: [{ label: "バニラアイス", delta: 150, dineInOnly: true }] },
 ];
 
-// カテゴリ表示用の商品一覧。季節メニューは seasonal フラグ付きを全カテゴリから集める（品自体は元のカテゴリにも残る）。
+// カテゴリ表示用の商品一覧。季節メニューは seasonal フラグ付きを、早割メニューは advanceOnly フラグ付きを
+// それぞれ集める仮想カテゴリ（品自体は元のカテゴリにも残る）。
 export function itemsForCategory(catId) {
   if (catId === "seasonal") return MENU.filter(m => m.seasonal);
+  if (catId === "early") return MENU.filter(m => m.advanceOnly);
   return MENU.filter(m => m.cat === catId);
 }
 export const BOX_PRICE = 100; // 箱（1個あたり）
@@ -293,6 +296,12 @@ export function advanceGate(item, today, pickupDate) {
   if (item.fromDate && today < item.fromDate) return "hidden";
   if (!pickupDate || pickupDate <= today) return "blocked";
   return "ok";
+}
+
+// 早割メニュー（仮想カテゴリ）を出すかどうか。advanceOnly 商品が1つでも受付開始日を
+// 迎えていれば true（＝その商品が一覧に出る状態）。customer.js のタブ表示判定に使う。
+export function earlyMenuVisible(today) {
+  return MENU.some(m => m.advanceOnly && advanceGate(m, today, null) !== "hidden");
 }
 
 // 揚げピザ祭り（期間限定の表示演出。本人指示 2026-11-27）。価格・注文ロジックには影響しない、
