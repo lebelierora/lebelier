@@ -7,10 +7,11 @@ import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
   todayKey, addDays, formatDateJP, isClosedDay, closedReason, timeSlots, leadMinutes,
   normalizePhone, esc, yen, SEATS, seatLabel, toMin, bookingEndKey, advanceGate,
-} from "./menu.js?v=20251127-111";
+  AGE_FESTIVAL, isAgeFestival,
+} from "./menu.js?v=20251127-112";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
-} from "./frozen-menu.js?v=20251126-84";
+} from "./frozen-menu.js?v=20251127-112";
 
 // 焼きピザ・冷凍ピザ両方のメニューから商品を引く
 const anyById = id => menuById(id) || frozenById(id);
@@ -143,10 +144,14 @@ function toast(msg, ms = 1200) {
 
 // ---------- メニュー ----------
 let currentCat = "seasonal";
+// カテゴリの表示名。お祭り期間中だけ対象カテゴリを祭り名に読み替える（データ側の名前は変えない）
+function catLabel(c) {
+  return c.id === AGE_FESTIVAL.cat && isAgeFestival(todayKey()) ? AGE_FESTIVAL.name : c.name;
+}
 function renderTabs() {
   const cats = mode === "frozen" ? FROZEN_CATEGORIES : CATEGORIES.filter(c => !c.hidden && (mode === "dinein" || !c.dineInOnly)); // dineInOnly のカテゴリ（スイーツ）は店内のみ
   $("cat-tabs").innerHTML = cats.map(c =>
-    `<button data-cat="${c.id}" class="${c.id === currentCat ? "active" : ""}">${esc(c.name)}</button>`).join("");
+    `<button data-cat="${c.id}" class="${c.id === currentCat ? "active" : ""}">${esc(catLabel(c))}</button>`).join("");
   $("cat-tabs").querySelectorAll("button").forEach(b =>
     b.addEventListener("click", () => { currentCat = b.dataset.cat; renderTabs(); renderGrid(); }));
 }
@@ -161,15 +166,31 @@ function advancePickupDate() {
 function advanceStateOf(it) { return advanceGate(it, todayKey(), advancePickupDate()); }
 function advanceBlocked(it) { return advanceStateOf(it) === "blocked"; }
 
+// untilDate（販売終了日）付き商品は、選んだ受け取り日がその日を過ぎたら一覧に出さない
+// （冷凍のお祭り商品が該当。受け取り日未選択の間は出す。日時を選んだ時点で再描画される）
+function untilHidden(it) {
+  if (!it || !it.untilDate) return false;
+  const d = advancePickupDate();
+  return !!d && d > it.untilDate;
+}
+
 function renderGrid() {
+  const festivalOn = mode !== "frozen" && isAgeFestival(todayKey()); // 揚げピザ祭りの表示期間か（閲覧日ベース）
+  const banner = $("festival-banner");
+  if (banner) {
+    const showBanner = festivalOn && currentCat === AGE_FESTIVAL.cat;
+    banner.classList.toggle("hidden", !showBanner);
+    if (showBanner) banner.textContent = `${AGE_FESTIVAL.name}開催中！ 12月1日〜1月3日の期間限定です`;
+  }
   const items = (mode === "frozen" ? frozenItemsForCategory(currentCat) : itemsForCategory(currentCat))
     .filter(m => !m.hidden && (mode === "dinein" || !m.dineInOnly) && (mode === "takeout" || !m.takeoutOnly)) // dineInOnly は店内のみ／takeoutOnly はテイクアウトのみ／hidden は常に出さない
-    .filter(m => advanceStateOf(m) !== "hidden"); // 早割商品は受付開始日より前は出さない
+    .filter(m => advanceStateOf(m) !== "hidden") // 早割商品は受付開始日より前は出さない
+    .filter(m => !untilHidden(m)); // 販売終了日を過ぎた受け取り日では出さない
   $("item-grid").innerHTML = items.map(m => `
     <button class="item" data-id="${m.id}">
       ${effImg(m) ? `<img src="${esc(effImg(m))}" alt="${esc(m.name)}" loading="lazy"${m.poster ? ` style="object-fit:contain;background:#f6efe3;"` : ""}>` : (m.img ? "" : `<div class="noimg">写真なし</div>`)}
       <div class="body">
-        <div class="name">${esc(m.name)}${m.seasonal ? ` <span class="season-badge">季節</span>` : ""}${m.eatInBadge ? ` <span class="eatin-badge">イートイン限定</span>` : ""}</div>
+        <div class="name">${esc(m.name)}${m.seasonal ? ` <span class="season-badge">季節</span>` : ""}${m.eatInBadge ? ` <span class="eatin-badge">イートイン限定</span>` : ""}${festivalOn && m.cat === AGE_FESTIVAL.cat ? ` <span class="festival-badge">期間限定</span>` : ""}</div>
         <!-- 一覧では説明文を表示しない（本人指示 2026-11-25：見づらいため。説明は詳細画面のみ） -->
         <div class="price">${yen(m.price)}${m.choice && m.choice.options.some(o => o.delta > 0) ? "〜" : ""}</div>
         ${advanceBlocked(m) ? `<div class="advance-note">前日までのご予約専用です</div>` : ""}
@@ -393,7 +414,7 @@ function renderDetail() {
       ${effImg(it) ? `<img class="detail-photo ${it.poster || mode === "frozen" ? "contain" : ""}" src="${esc(effImg(it))}" alt="${esc(it.name)}">
       <div class="scroll-hint" id="detail-scroll-hint">↓ 下で味や大きさなどを選べます</div>` : ""}
       <div style="padding:14px;">
-        <div style="font-size:20px;font-weight:900;">${esc(it.name)}${it.seasonal ? ` <span class="season-badge">季節メニュー</span>` : ""}${it.eatInBadge ? ` <span class="eatin-badge">イートイン限定</span>` : ""}</div>
+        <div style="font-size:20px;font-weight:900;">${esc(it.name)}${it.seasonal ? ` <span class="season-badge">季節メニュー</span>` : ""}${it.eatInBadge ? ` <span class="eatin-badge">イートイン限定</span>` : ""}${mode !== "frozen" && it.cat === AGE_FESTIVAL.cat && isAgeFestival(todayKey()) ? ` <span class="festival-badge">期間限定</span>` : ""}</div>
         ${descHtml(it)}
         <div style="font-weight:900;font-size:19px;margin-top:8px;">${yen(it.price)}</div>
       </div>
@@ -542,6 +563,13 @@ function pickupProblemSync() {
   // （早割を入れた後に、日時だけ当日へ変更されたケースをここで止める）
   if (p.date <= todayKey() && cart.some(c => { const it = anyById(c.itemId); return it && it.advanceOnly; })) {
     return { type: "advance", message: "早割商品は当日の受け取りでは注文できません。日時を明日以降に変更するか、早割商品をカートから外してください。" };
+  }
+  // 販売終了日（untilDate）のある商品がカートにあるのに、受け取り日がその日を過ぎている場合は注文できない
+  // （対象商品を入れた後に、日時だけ販売終了後へ変更されたケースをここで止める。カートの中身は保持される）
+  const untilItem = cart.map(c => anyById(c.itemId)).find(it => it && it.untilDate && p.date > it.untilDate);
+  if (untilItem) {
+    const lim = fmtShort(untilItem.untilDate);
+    return { type: "until", message: `${untilItem.name}は${lim}までの販売です。日時を${lim}までに変更するか、カートから外してください。` };
   }
   if (mode === "takeout" && p.date === todayKey() && !timeSlots(p.date, cartQty()).includes(p.time)) {
     const lead = leadMinutes(cartQty());
@@ -730,13 +758,13 @@ function refreshCheckoutPickupWarn() {
   if (mode === "dinein" || currentScreen !== "scr-checkout") return;
   const prob = pickupProblemSync();
   if (prob) { setPickupWarn(prob.type, prob.message); return; }
-  if (pickupWarnKind === "lead" || pickupWarnKind === "unset" || pickupWarnKind === "advance") setPickupWarn(null, "");
+  if (pickupWarnKind === "lead" || pickupWarnKind === "unset" || pickupWarnKind === "advance" || pickupWarnKind === "until") setPickupWarn(null, "");
 }
 // 会計画面に入った時点の日時チェック（受付停止・枠の埋まりは daySlots を読んで確認する）
 async function validatePickupAtCheckout() {
   const prob = pickupProblemSync();
   if (prob) { setPickupWarn(prob.type, prob.message); return; }
-  if (pickupWarnKind === "lead" || pickupWarnKind === "unset" || pickupWarnKind === "advance") setPickupWarn(null, "");
+  if (pickupWarnKind === "lead" || pickupWarnKind === "unset" || pickupWarnKind === "advance" || pickupWarnKind === "until") setPickupWarn(null, "");
   if (mode !== "takeout") return;
   try {
     const snap = await getDoc(doc(db, "daySlots", selDate));

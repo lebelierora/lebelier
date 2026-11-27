@@ -291,6 +291,16 @@ export function advanceGate(item, today, pickupDate) {
   return "ok";
 }
 
+// 揚げピザ祭り（期間限定の表示演出。本人指示 2026-11-27）。価格・注文ロジックには影響しない、
+// 表示だけの仕組み。期間中は customer.js が対象カテゴリの表示名を name に読み替え、
+// 一覧の上にバナーを出し、対象カテゴリの商品に「期間限定」バッジを付ける。
+// 期間外は通常表示に自動で戻る（開始も終了も手作業は不要）。次回のお祭りは期間と名前を差し替えて再利用する。
+export const AGE_FESTIVAL = { cat: "age", name: "揚げピザ祭り", from: "2026-12-01", to: "2027-01-03" };
+// 閲覧日（"YYYY-MM-DD"）がお祭り期間内かどうか
+export function isAgeFestival(key) {
+  return !!key && key >= AGE_FESTIVAL.from && key <= AGE_FESTIVAL.to;
+}
+
 // その日の最終枠 "HH:MM"（日曜17:30 / それ以外19:30、例外があればそちら優先）
 export function lastSlot(key) {
   const ov = dateOverride(key);
