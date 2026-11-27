@@ -619,7 +619,7 @@ function startPickupFlow(returnTo) {
   else watchSlots();
   show("scr-pickup");
 }
-function finishPickupFlow() { // 「この日時で注文する」
+function finishPickupFlow() { // 「この日時で決定する」
   if (!selTime) return;
   pickupSel[mode] = { date: selDate, time: selTime };
   unwatchSlots();
@@ -760,6 +760,8 @@ function renderSlots() {
     ? `冷凍ピザはご用意に時間がかかるため、受け取りは翌々日から${formatDateJP(bookingEndKey())}までです。日時はご希望として受け付け、お店が確認して確定します。当日・翌日にお急ぎの場合はお電話ください（0276-70-2321）。`
     : selDate === todayKey()
     ? (cartQty() >= 5 ? `ご注文点数が多いため、最短で${lead}分後からの受け取りになります。` : `最短で${lead}分後からの受け取りになります。`)
+    : slots.length > 0
+    ? `この日のお受け取りは ${slots[0]}〜${slots[slots.length - 1]} の間でお選びください。`
     : "営業時間内（11:00〜最終受け取り 月〜土19:30／日曜17:30）でお選びください。";
   // 既に注文が入っている枠（1枠1注文）は選べないようにする。受付停止中は当日枠の全部が対象
   $("slot-grid").innerHTML = slots.map(s => {
@@ -777,7 +779,7 @@ function renderSlots() {
   const pb = $("pickup-proceed");
   if (pb) {
     pb.disabled = !selTime;
-    pb.textContent = selTime ? `この日時で注文する（${fmtShort(selDate)} ${selTime}）` : "時刻をお選びください";
+    pb.textContent = selTime ? `この日時で決定する（${fmtShort(selDate)} ${selTime}）` : "時刻をお選びください";
   }
 }
 function openCheckout() {
