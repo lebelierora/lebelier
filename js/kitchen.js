@@ -62,6 +62,11 @@ let knownCalls = new Set();
 let started = false;
 let startedDinein = false;
 let startedCalls = false;
+// 本日のテイクアウト受付停止（daySlots/{今日}.takeoutStopped）。フラグは「その日のドキュメント」に
+// だけ立つので、翌日は新しいドキュメントにフラグが無く自動で通常受付に戻る（切り戻し忘れ防止）。
+let todayTakeoutStopped = false;
+let stopDateKey = null; // 停止フラグを購読中の日付キー（日付が変わったら張り替える）
+let stopUnsub = null;
 
 // ---------- 伝票印刷（PassPRNT） ----------
 // プリンター：スター精密 mC-Print3（TCP:192.168.11.40／80mm = size 576）。印刷は PassPRNT アプリ経由
@@ -242,6 +247,47 @@ async function takeSlot(o, date, time) {
   catch (e) { console.error("枠の確保に失敗", e); }
 }
 
+// ---------- 本日のテイクアウト受付停止 ----------
+// 対象は「今日受け取りのテイクアウト」だけ。店内注文・明日以降の予約・冷凍予約は止めない。
+// フラグは daySlots/{今日} に merge で書く（taken マップは消さない）。厨房の全端末で状態を共有する。
+function watchTodayStop() {
+  if (stopUnsub) { stopUnsub(); stopUnsub = null; }
+  stopDateKey = todayKey();
+  stopUnsub = onSnapshot(doc(db, "daySlots", stopDateKey), snap => {
+    todayTakeoutStopped = !!(snap.exists() && snap.data().takeoutStopped);
+    renderStopControl();
+  }, e => console.error("受付停止状態の購読に失敗", e));
+}
+function renderStopControl() {
+  const banner = $("stop-banner");
+  const btn = $("stop-btn");
+  if (!banner || !btn) return;
+  banner.classList.toggle("hidden", !todayTakeoutStopped);
+  btn.textContent = todayTakeoutStopped ? "本日のテイクアウト受付を再開する" : "本日のテイクアウト受付を止める";
+  btn.classList.toggle("stopped", todayTakeoutStopped);
+}
+async function setTakeoutStopped(stop) {
+  if (stop && !confirm("本日のテイクアウト受付を止めますか？\n今日の受け取りのご注文ができなくなります（明日以降のご予約・店内注文・冷凍予約は通常通りです）。\n明日になると自動で通常受付に戻ります。")) return;
+  const btn = $("stop-btn");
+  if (btn) btn.disabled = true;
+  try {
+    if (stop) {
+      await setDoc(doc(db, "daySlots", todayKey()),
+        { takeoutStopped: true, takeoutStoppedAt: serverTimestamp() }, { merge: true });
+    } else {
+      await setDoc(doc(db, "daySlots", todayKey()),
+        { takeoutStopped: false, takeoutStoppedAt: deleteField() }, { merge: true });
+    }
+  } catch (e) {
+    console.error("受付停止状態の変更に失敗", e);
+    alert("受付状態の変更に失敗しました。通信環境をご確認のうえ、もう一度お試しください。");
+  } finally {
+    if (btn) btn.disabled = false;
+    renderStopControl(); // スナップショットでも更新されるが、失敗時表示の巻き戻しも兼ねる
+  }
+}
+$("stop-btn").addEventListener("click", () => setTakeoutStopped(!todayTakeoutStopped));
+
 function startListeners() {
   // テスト段階では全件購読し、表示は「昨日以降の受け取り分」に絞る（件数は少ない前提）
   onSnapshot(collection(db, "takeoutOrders"), snap => {
@@ -281,7 +327,9 @@ function startListeners() {
     blocked = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderBlocked();
   });
-  setInterval(render, 30000); // カウントダウン更新
+  watchTodayStop();
+  // カウントダウン更新＋日付が変わったら停止フラグの購読先（その日の daySlots）を張り替える
+  setInterval(() => { render(); if (todayKey() !== stopDateKey) watchTodayStop(); }, 30000);
   // 未受付がある間は繰り返し知らせる。両方あるときは「呼び出しの声 → 注文の声」の順でキューに入れる
   setInterval(() => {
     if (calls.length > 0) playCallSound(calls[0].purpose, calls[0].custom); // 一番長く待っている呼び出しの用件で知らせる

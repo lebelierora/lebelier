@@ -64,6 +64,10 @@
   .danger-fill:disabled{opacity:.45;cursor:not-allowed;}
   .reset-status{margin-top:10px;font-size:16px;font-weight:800;white-space:pre-wrap;}
   .reset-status.err{color:#c0392b;}
+  .stop-banner{background:#fdedec;border:3px solid var(--warn);color:#922b21;border-radius:14px;padding:12px 16px;font-weight:900;font-size:20px;margin-top:10px;}
+  .stop-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px;}
+  .stop-row .stop-label{font-weight:900;font-size:17px;}
+  #stop-btn.stopped{background:#c0392b;color:#fff;border-color:#c0392b;}
   </style>
 </head>
 <body>
@@ -95,6 +99,11 @@
   </div>
   <div id="sound-banner" class="sound-banner hidden">音が出ない状態です。画面をタップすると音が有効になります</div>
   <div id="print-msg" class="print-msg hidden"></div>
+  <div id="stop-banner" class="stop-banner hidden">⛔ 本日のテイクアウト受付を停止中です（明日以降のご予約・店内注文は通常通りです）</div>
+  <div class="stop-row">
+    <span class="stop-label">本日のテイクアウト受付：</span>
+    <button class="btn ghost small" id="stop-btn" type="button">本日のテイクアウト受付を止める</button>
+  </div>
   <div class="tabs" id="kind-tabs" style="margin-top:4px;">
     <button data-tab="all" class="active">すべて</button>
     <button data-tab="dinein">店内</button>
@@ -142,6 +151,6 @@
 <audio id="order-sound" src="audio/moko-order-v2.mp3" preload="auto"></audio>
 <audio id="call-sound" src="audio/moko-call-v2.mp3" preload="auto"></audio>
 
-<script type="module" src="js/kitchen.js?v=20251127-104"></script>
+<script type="module" src="js/kitchen.js?v=20251127-105"></script>
 </body>
 </html>

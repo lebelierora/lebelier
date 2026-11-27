@@ -473,6 +473,7 @@ let selDate = todayKey();
 let selTime = null;
 let sealChoice = null; // 冷凍予約の温め方シール: "need" | "none"
 let occupiedTimes = new Set(); // 選択中の受け取り日に既に注文が入っている時刻（重複防止）
+let slotDocStopped = false;    // 選択中の日の daySlots に takeoutStopped が立っているか（意味を持つのは本日のみ）
 let slotSub = null;            // 枠の埋まり状況の購読解除関数
 let submitting = false;        // 注文送信中は、自分の注文で枠が埋まった通知を抑制する
 
@@ -480,16 +481,21 @@ let submitting = false;        // 注文送信中は、自分の注文で枠が�
 function watchSlots() {
   unwatchSlots();
   occupiedTimes = new Set();
+  slotDocStopped = false;
   slotSub = onSnapshot(doc(db, "daySlots", selDate), snap => {
-    occupiedTimes = new Set(Object.keys(snap.exists() ? (snap.data().taken || {}) : {}));
-    if (!submitting && selTime && occupiedTimes.has(selTime)) {
+    const data = snap.exists() ? snap.data() : {};
+    occupiedTimes = new Set(Object.keys(data.taken || {}));
+    slotDocStopped = !!data.takeoutStopped;
+    // 本日分が受付停止になったら、選択中の時刻も取り消す（停止はテイクアウトの当日分だけ）
+    const stoppedNow = slotDocStopped && selDate === todayKey() && mode === "takeout";
+    if (!submitting && selTime && (occupiedTimes.has(selTime) || stoppedNow)) {
       selTime = null;
-      toast("選択していた時刻が埋まりました");
+      toast(stoppedNow ? "本日の注文受付が終了しました" : "選択していた時刻が埋まりました");
     }
     renderSlots();
   }, e => console.error(e));
 }
-function unwatchSlots() { if (slotSub) { slotSub(); slotSub = null; } }
+function unwatchSlots() { if (slotSub) { slotSub(); slotSub = null; } slotDocStopped = false; }
 function dateChipList() {
   const list = [];
   // 冷凍予約は翌々日（+2）から、焼きピザは今日から。どちらも1週間先（+7）まで
@@ -546,6 +552,9 @@ function renderCart() {
 }
 function renderSlots() {
   const slots = timeSlots(selDate, cartQty());
+  // 厨房が本日のテイクアウト受付を止めている間は、当日枠を全て「受付終了」にする（将来日・冷凍は対象外）
+  const stoppedToday = mode === "takeout" && selDate === todayKey() && slotDocStopped;
+  if (stoppedToday) selTime = null;
   if (selTime && (!slots.includes(selTime) || occupiedTimes.has(selTime))) selTime = null;
   const lead = leadMinutes(cartQty());
   $("lead-note").textContent = mode === "frozen"
@@ -553,12 +562,14 @@ function renderSlots() {
     : selDate === todayKey()
     ? (cartQty() >= 5 ? `ご注文点数が多いため、最短で${lead}分後からの受け取りになります。` : `最短で${lead}分後からの受け取りになります。`)
     : "営業時間内（11:00〜最終受け取り 月〜土19:30／日曜17:30）でお選びください。";
-  // 既に注文が入っている枠（1枠1注文）は選べないようにする
+  // 既に注文が入っている枠（1枠1注文）は選べないようにする。受付停止中は当日枠の全部が対象
   $("slot-grid").innerHTML = slots.map(s => {
-    const full = occupiedTimes.has(s);
+    const full = occupiedTimes.has(s) || stoppedToday;
     return `<button data-slot="${s}" class="${s === selTime ? "active" : ""}" ${full ? "disabled" : ""}>${s}${full ? `<span class="full-label">受付終了</span>` : ""}</button>`;
   }).join("");
-  $("slot-empty").textContent = slots.length === 0
+  $("slot-empty").textContent = stoppedToday
+    ? "本日の注文受付は終了しました。明日以降の日付でご注文いただけます。"
+    : slots.length === 0
     ? (isThursday(selDate) ? "木曜日は定休日です。別の日をお選びください。" : "本日の受け取り枠は終了しました。別の日をお選びください。")
     : slots.every(s => occupiedTimes.has(s)) ? "この日の受け取り枠はすべて埋まっています。別の日をお選びください。" : "";
   $("slot-grid").querySelectorAll("button:not(:disabled)").forEach(b =>
@@ -656,12 +667,20 @@ async function submitOrder() {
       try {
         await runTransaction(db, async (tx) => {
           const s = await tx.get(slotRef);
-          const taken = s.exists() ? (s.data().taken || {}) : {};
+          const sdata = s.exists() ? s.data() : {};
+          // 厨房が本日の受付を止めた直後に送信された当日注文は、ここで確実に弾く（この分岐はテイクアウトのみ）
+          if (selDate === todayKey() && sdata.takeoutStopped) throw new Error("today-stopped");
+          const taken = sdata.taken || {};
           if (taken[selTime]) throw new Error("slot-taken");
           tx.set(slotRef, { taken: { ...taken, [selTime]: orderNo } });
           tx.set(orderRef, orderData);
         });
       } catch (e) {
+        if (e && e.message === "today-stopped") {
+          btn.disabled = false; btn.textContent = "この内容で注文を送信する";
+          selTime = null; renderSlots();
+          return err("本日の注文受付が終了したため、注文できませんでした。日付を変えてお試しください。");
+        }
         if (e && e.message === "slot-taken") {
           btn.disabled = false; btn.textContent = "この内容で注文を送信する";
           selTime = null; renderSlots();
