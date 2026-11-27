@@ -113,9 +113,10 @@ function ticketItemsHtml(o) {
                     i.pack ? (i.pack === "box" ? "箱" : "紙皿・ホイル") : null,
                     i.choice || null,
                     ...(i.toppings || [])].filter(Boolean).join("／");
-    // 伝票では提供タイミングを既定（すぐ提供／できた順）でも常時表示する（厨房カードは非既定のみのまま）
+    // 伝票では提供タイミングを既定（すぐ提供／でき次第）でも常時表示する（厨房カードは非既定のみのまま）
+    // 旧文言「できた順」で保存された注文も「でき次第」と表示する（表示側の読み替え）
     const timing = i.timing
-      ? `<div style="font-size:36px;font-weight:bold;">提供：${esc(i.timing)}</div>` : "";
+      ? `<div style="font-size:36px;font-weight:bold;">提供：${esc(i.timing === "できた順" ? "でき次第" : i.timing)}</div>` : "";
     return `<div style="font-size:40px;font-weight:bold;">${esc(i.name)} × ${i.qty}</div>` +
       (custom ? `<div style="font-size:34px;">${esc(custom)}</div>` : "") + timing;
   }).join("");
@@ -477,7 +478,7 @@ function itemsHtml(o) {
                     i.pack ? (i.pack === "box" ? "箱" : "紙皿・ホイル") : null,
                     i.choice || null,
                     ...(i.toppings || [])].filter(Boolean).join("／");
-    const timingLine = (i.timing && i.timing !== "すぐ提供" && i.timing !== "できた順")
+    const timingLine = (i.timing && i.timing !== "すぐ提供" && i.timing !== "できた順" && i.timing !== "でき次第")
       ? `<div class="kcustom" style="color:#b3271e;font-weight:900;">⏰ 提供：${esc(i.timing)}</div>` : "";
     return `<div><div class="kitem">${esc(i.name)} × ${i.qty}</div>${custom ? `<div class="kcustom">${esc(custom)}</div>` : ""}${timingLine}</div>`;
   }).join("");

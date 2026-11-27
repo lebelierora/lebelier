@@ -164,9 +164,10 @@ function effDesc(it) { return (mode === "dinein" && it.descDineIn !== undefined)
 
 // ---------- 商品詳細 ----------
 // ---------- 提供タイミング（店内のみ） ----------
-// ドリンク: すぐ提供／最初の商品と一緒／食後、スイーツ系: できた順／最後。先頭が既定（選ばなくても注文できる）
+// ドリンク: すぐ提供／最初の商品と一緒／食後、スイーツ系: でき次第／最後。先頭が既定（選ばなくても注文できる）
+// ※スイーツ系の既定は旧文言「できた順」から「でき次第」に変更（2026-11-27）。旧文言で保存された注文は表示側で読み替える
 const TIMING_DRINK = ["すぐ提供", "最初の商品と一緒", "食後"];
-const TIMING_SWEET = ["できた順", "最後"];
+const TIMING_SWEET = ["でき次第", "最後"];
 function timingOptions(it) {
   if (mode !== "dinein") return null;
   const kind = it.timing || (it.cat === "drink" ? "drink"
@@ -760,7 +761,7 @@ function renderDineinCart() {
         c.cut ? (c.cut === "cut4" ? "4カット" : c.cut === "cut6" ? "6カット" : "未カット") : null,
         c.choice || null,
         ...(c.toppings || []),
-        (c.timing && c.timing !== "すぐ提供" && c.timing !== "できた順") ? `提供：${c.timing}` : null,
+        (c.timing && c.timing !== "すぐ提供" && c.timing !== "できた順" && c.timing !== "でき次第") ? `提供：${c.timing}` : null,
       ].filter(Boolean).join("／");
       return `<div class="cart-line">
         <div class="grow">
