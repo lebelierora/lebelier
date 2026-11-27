@@ -424,7 +424,7 @@ function renderDetail() {
   const it = detail.item;
   // onlyChoice 付きトッピングは、その選択肢を選んだときだけ有効（例：ラテのアイストッピングはアイスのみ）。選択が合わなければ自動で外す
   (it.toppings || []).forEach(t => { if (t.onlyChoice && detail.choice !== t.onlyChoice) detail.toppings.delete(t.label); });
-  // 案内文「↓ 下で味や大きさなどを選べます」は、数量以外の選択肢が実際にある商品だけに出す（下の描画と同じ条件で判定）
+  // 案内文（↓ 下で〜を選べます）は、数量以外の選択肢が実際にある商品だけに出し、文言は下の選択グループ名で組み立てる
   const choiceVisible = it.choice && (mode === "dinein" || !it.choice.dineInOnly); // dineInOnly の choice は店内のみ（例：生ビールの小サイズ）
   // 選択肢単位の dineInOnly（例：烏龍茶のホットは店内のみ。テイクアウトはアイスのみ）
   const visibleOptions = choiceVisible ? it.choice.options.filter(o => mode === "dinein" || !o.dineInOnly) : [];
@@ -434,15 +434,22 @@ function renderDetail() {
     if (effChoice && !visibleOptions.some(o => o.label === effChoice)) effChoice = null;
     else if (!effChoice && visibleOptions.length === 1) effChoice = visibleOptions[0].label;
   }
-  const hasSelectable = (hasCutPack(it) && !(mode === "dinein" && it.noCutDineIn)) // カット（店内でカットなし提供の注記のみの場合は除く）
-    || (hasCutPack(it) && mode === "takeout") // 包装（テイクアウトのみ）
-    || (choiceVisible && visibleOptions.length > 0)
-    || (it.toppings || []).some(t => (mode === "dinein" || !t.dineInOnly) && (!t.onlyChoice || effChoice === t.onlyChoice))
-    || !!timingOptions(it);
+  // 実際に描画される選択グループの見出し名（下の描画と同じ条件で判定し、描画順に並べる）
+  const selectableNames = [];
+  if (hasCutPack(it) && !(mode === "dinein" && it.noCutDineIn)) selectableNames.push("カット"); // 店内でカットなし提供の注記のみの場合は除く
+  if (hasCutPack(it) && mode === "takeout") selectableNames.push("包装"); // 包装はテイクアウトのみ
+  // choice の見出し名は末尾の「をお選びください」を落とした短い形にする（例：「チーズの量をお選びください」→「チーズの量」）
+  if (choiceVisible && visibleOptions.length > 0) selectableNames.push(String(it.choice.label || "").replace(/をお選びください$/, ""));
+  if ((it.toppings || []).some(t => (mode === "dinein" || !t.dineInOnly) && (!t.onlyChoice || effChoice === t.onlyChoice))) selectableNames.push("トッピング");
+  if (timingOptions(it)) selectableNames.push("タイミング"); // 見出しは「提供のタイミング」のまま、案内文の中では短く呼ぶ
+  const hasSelectable = selectableNames.length > 0;
+  const detailHintText = selectableNames.length > 1
+    ? `↓ 下で、${selectableNames.join("・")}などを選べます`
+    : `↓ 下で、${selectableNames[0]}を選べます`;
   let html = `
     <div class="card" style="padding:0;overflow:hidden;">
       ${effImg(it) ? `<img class="detail-photo ${it.poster || mode === "frozen" ? "contain" : ""}" src="${esc(effImg(it))}" alt="${esc(it.name)}">${hasSelectable ? `
-      <div class="scroll-hint" id="detail-scroll-hint">↓ 下で味や大きさなどを選べます</div>` : ""}` : ""}
+      <div class="scroll-hint" id="detail-scroll-hint">${esc(detailHintText)}</div>` : ""}` : ""}
       <div style="padding:14px;">
         <div style="font-size:20px;font-weight:900;">${esc(it.name)}${it.seasonal ? ` <span class="season-badge">季節メニュー</span>` : ""}${it.eatInBadge ? ` <span class="eatin-badge">イートイン限定</span>` : ""}${mode !== "frozen" && it.cat === AGE_FESTIVAL.cat && isAgeFestival(todayKey()) ? ` <span class="festival-badge">期間限定</span>` : ""}</div>
         ${descHtml(it)}
