@@ -74,6 +74,8 @@ let stopUnsub = null;
 // localStorage の printRoute（"cloud" | "pass"、既定 "cloud"）で切り替え、厨房画面のトグルでも変更できる。
 // タイミング（本人の決定）：店内注文は注文が入った瞬間。テイクアウト・冷凍は受け取りが
 // 翌日以降なら注文が入った時点、当日受け取りなら厨房で確定した瞬間。呼び出しは印刷しない。
+// 受付（確定）も同じ線引きで、受け取りが翌日以降のテイクアウト・冷凍は注文が入った時点で
+// 自動受付する（本人の決定 2026-11-28）。当日受け取りは従来どおり厨房の受付ボタンで確定する。
 // どちらの経路でも、印刷済みフラグ（printedAt）を出す前に Firestore へ記録しておくことが
 // 二重印刷・ループ防止の要（PassPRNT は戻りURLでこのページが再読み込みされるため特に重要）。
 // CloudPRNT の受け口は http（プリンターが https ではこの宛先に接続できないため実機確認のうえ http）。
@@ -85,6 +87,7 @@ function printRoute() {
   catch (e) { return "cloud"; }
 }
 const autoPrintAttempted = new Set(); // このページ表示中に自動印刷を試みた注文（メモリ上のループ防止）
+const autoAcceptAttempted = new Set(); // このページ表示中に自動受付を試みた注文（メモリ上の二重実行防止）
 let printReturn = null;               // PassPRNT からの戻り情報 {code, message, kind, id}
 let printMsg = "";
 let printMsgOk = true;
@@ -488,6 +491,16 @@ function printsOnArrival(o, todayStr) {
 }
 // ==== ARRIVAL-PRINT-LOGIC-END ====
 
+// ==== AUTO-ACCEPT-LOGIC-BEGIN ====
+// 事前予約の自動受付の対象判定（純粋関数）。受け取りが翌日以降のテイクアウト・冷凍は、
+// 厨房が受付ボタンを押さなくても、注文が入った時点で自動的に受付（確定）にする
+// （本人の決定 2026-11-28）。対象集合は到着時自動印刷（printsOnArrival）と同一にし、
+// 印刷と受付が同じ注文に揃うようにする。当日受け取りは対象外（従来どおり手動確定）。
+function autoAcceptOnArrival(o, todayStr) {
+  return !!o && o.status === "pending" && printsOnArrival(o, todayStr);
+}
+// ==== AUTO-ACCEPT-LOGIC-END ====
+
 // 店内注文の自動印刷：未印刷の確認待ちを来た順に試みる。
 // CloudPRNT は画面遷移がないので全件まとめて投入し、Worker 側の FIFO に任せる。
 // PassPRNT は戻るたびにページが再読み込みされるため、先頭の1件だけを対象にする。
@@ -510,6 +523,56 @@ function maybeAutoPrintTakeout() {
     .sort((a, b) => tsMillis(a.createdAt) - tsMillis(b.createdAt));
   if (printRoute() === "cloud") targets.forEach(o => launchPrintCloud("takeout", o, true));
   else if (targets[0]) launchPrintPassPrnt("takeout", targets[0], true);
+}
+
+// 受付（確定）処理の本体。厨房の「受付」ボタンと、事前予約の自動受付の両方から呼ぶ。
+// frozenDate: 冷凍の日付変更（受付ボタンのセレクト値）。省略時は希望日（pickupDate）のまま確定する。
+// 確定した瞬間の印刷もここで行う（到着時に印刷済みなら printedAt / 試行ガードで再印刷しない）。
+async function acceptOrder(o, frozenDate) {
+  const upd = {
+    status: "confirmed", confirmedPickup: toHHMM(proposedTime(o)), confirmedAt: serverTimestamp(),
+  };
+  if (o.kind === "frozen") {
+    const newDate = frozenDate || o.pickupDate;
+    upd.pickupDate = newDate;
+    upd.confirmedDate = newDate;
+  }
+  await updateDoc(doc(db, "takeoutOrders", o.id), upd);
+  if (o.kind !== "frozen") {
+    const oldDate = o.confirmedDate || o.pickupDate;
+    const oldTime = o.confirmedPickup || o.requestedPickup;
+    const newDate = upd.pickupDate || oldDate;
+    if (oldDate !== newDate || oldTime !== upd.confirmedPickup) {
+      await freeSlot(o);
+      await takeSlot(o, newDate, upd.confirmedPickup);
+    }
+  }
+  // 確定した瞬間に伝票を印刷する（当日受け取り分と、到着時印刷が未実施だった場合の再試行。
+  // 翌日以降の受け取りは到着時に印刷済みのことが多く、その場合は printedAt ガードで再印刷しない。
+  // 伝票には確定時刻を使う）
+  if (!o.printedAt) {
+    const confirmedOrder = { ...o, ...upd, pickupDate: upd.pickupDate || o.pickupDate };
+    launchPrint("takeout", confirmedOrder, true);
+  }
+}
+
+// 事前予約の自動受付：受け取りが翌日以降で確認待ちの注文を、注文が入った時点で
+// 自動的に受付（確定）にする。厨房ページを開いたときに初めて目にする分もここで拾う
+// （到着時自動印刷と同じ発火点）。二重実行防止は、status が confirmed になれば
+// 対象外になるのが本筋で、更新が反映されるまでの間は autoAcceptAttempted で抑える。
+// 失敗した注文はガードを外し、次のスナップショットで再試行できるようにする。
+function maybeAutoAcceptTakeout() {
+  const tk = todayKey();
+  const targets = orders
+    .filter(o => autoAcceptOnArrival(o, tk) && !autoAcceptAttempted.has(o.id))
+    .sort((a, b) => tsMillis(a.createdAt) - tsMillis(b.createdAt));
+  for (const o of targets) {
+    autoAcceptAttempted.add(o.id);
+    acceptOrder(o, null).catch(e => {
+      console.error("事前予約の自動受付に失敗", e);
+      autoAcceptAttempted.delete(o.id);
+    });
+  }
 }
 
 // カード内の印刷まわり（失敗警告／店内の大きな印刷ボタン／再印刷ボタン）
@@ -628,6 +691,7 @@ function startListeners() {
     started = true;
     render();
     maybeAutoPrintTakeout(); // 翌日以降の受け取りは、確定を待たず入った時点で伝票を出す
+    maybeAutoAcceptTakeout(); // 翌日以降の受け取りは、受付ボタンを押さなくても入った時点で自動受付する
   });
   onSnapshot(collection(db, "dineInOrders"), snap => {
     dineinOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1032,32 +1096,9 @@ function bindCardButtons() {
     const o = orders.find(x => x.id === b.dataset.accept);
     if (!o) return;
     b.disabled = true;
-    const upd = {
-      status: "confirmed", confirmedPickup: toHHMM(proposedTime(o)), confirmedAt: serverTimestamp(),
-    };
-    if (o.kind === "frozen") {
-      const sel = document.querySelector(`[data-fzdate="${o.id}"]`);
-      const newDate = sel ? sel.value : o.pickupDate;
-      upd.pickupDate = newDate;
-      upd.confirmedDate = newDate;
-    }
-    await updateDoc(doc(db, "takeoutOrders", o.id), upd);
-    if (o.kind !== "frozen") {
-      const oldDate = o.confirmedDate || o.pickupDate;
-      const oldTime = o.confirmedPickup || o.requestedPickup;
-      const newDate = upd.pickupDate || oldDate;
-      if (oldDate !== newDate || oldTime !== upd.confirmedPickup) {
-        await freeSlot(o);
-        await takeSlot(o, newDate, upd.confirmedPickup);
-      }
-    }
-    // 確定した瞬間に伝票を印刷する（当日受け取り分と、到着時印刷が未実施だった場合の再試行。
-    // 翌日以降の受け取りは到着時に印刷済みのことが多く、その場合は printedAt ガードで再印刷しない。
-    // 伝票には確定時刻を使う）
-    if (!o.printedAt) {
-      const confirmedOrder = { ...o, ...upd, pickupDate: upd.pickupDate || o.pickupDate };
-      launchPrint("takeout", confirmedOrder, true);
-    }
+    // 冷凍は日付変更セレクトの値を渡す。本体は acceptOrder に共通化（自動受付も同じ処理を通る）
+    const sel = o.kind === "frozen" ? document.querySelector(`[data-fzdate="${o.id}"]`) : null;
+    await acceptOrder(o, sel ? sel.value : null);
   }));
   document.querySelectorAll("[data-done]").forEach(b => b.addEventListener("click", async () => {
     const o = orders.find(x => x.id === b.dataset.done);
