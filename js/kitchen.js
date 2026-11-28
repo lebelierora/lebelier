@@ -518,7 +518,8 @@ function renderPrintRoute() {
   state.textContent = cloud ? "クラウド印刷（画面切り替えなし）" : "PassPRNT（アプリ経由）";
   btn.textContent = cloud ? "PassPRNTに切り替える" : "クラウド印刷に切り替える";
 }
-$("print-route-btn").addEventListener("click", () => {
+const printRouteBtn = $("print-route-btn");
+if (printRouteBtn) printRouteBtn.addEventListener("click", () => {
   try { localStorage.setItem(PRINT_ROUTE_KEY, printRoute() === "cloud" ? "pass" : "cloud"); } catch (e) {}
   renderPrintRoute();
 });
