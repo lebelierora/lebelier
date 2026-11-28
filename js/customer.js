@@ -144,23 +144,58 @@ function toast(msg, ms = 1200) {
 }
 
 // ---------- メニュー ----------
-let currentCat = "seasonal";
+let currentCat = "seasonal"; // 店内モードの選択中カテゴリ（テイクアウト／冷凍は下の CAT-SELECT-LOGIC でモード別に保持）
+// ==== CAT-SELECT-LOGIC-BEGIN ====
+// テイクアウト／冷凍のカテゴリ選択状態（純粋ロジック。DOM・Firebase には触らない）
+// 2026-11-28 本人要望：メニュー入場直後はカテゴリ未選択にし、お客様がタップして初めて商品を出す。
+// 一度選んだらそのモードでは選択を保持する（詳細・カートから戻っても未選択には戻さない）。
+const pickedCat = { takeout: null, frozen: null }; // モード別に選んだカテゴリID（null = 未選択）
+function activeCatFor(m, dineinCat, cats) {
+  if (m === "dinein") return dineinCat;
+  const p = pickedCat[m];
+  return p && cats.some(c => c.id === p) ? p : null; // 表示できないカテゴリが選ばれていたら未選択として扱う
+}
+function pickCat(m, id) { if (m === "takeout" || m === "frozen") pickedCat[m] = id; }
+// ==== CAT-SELECT-LOGIC-END ====
 // カテゴリの表示名。お祭り期間中だけ対象カテゴリを祭り名に読み替える（データ側の名前は変えない）
 function catLabel(c) {
   return c.id === AGE_FESTIVAL.cat && isAgeFestival(todayKey()) ? AGE_FESTIVAL.name : c.name;
 }
-function renderTabs() {
+function visibleCats() {
   // dineInOnly のカテゴリ（スイーツ）は店内のみ／takeoutOnly のカテゴリ（早割メニュー）はテイクアウトのみ。
   // 早割メニューは受付開始日（2026-11-30）より前はタブ自体を出さない。
-  const cats = mode === "frozen" ? FROZEN_CATEGORIES : CATEGORIES.filter(c => !c.hidden
+  return mode === "frozen" ? FROZEN_CATEGORIES : CATEGORIES.filter(c => !c.hidden
     && (mode === "dinein" || !c.dineInOnly)
     && (mode === "takeout" || !c.takeoutOnly)
     && (c.id !== "early" || earlyMenuVisible(todayKey())));
-  if (!cats.some(c => c.id === currentCat)) currentCat = cats.length ? cats[0].id : currentCat; // 表示できないカテゴリが選択中なら先頭へ
+}
+function renderTabs() {
+  const cats = visibleCats();
+  // 店内だけは従来どおり常にどれか1つが選択済み（表示できないカテゴリが選択中なら先頭へ）。
+  // テイクアウト／冷凍は未選択が正規の初期状態なので、ここでは先頭へ寄せない。
+  if (mode === "dinein" && !cats.some(c => c.id === currentCat)) currentCat = cats.length ? cats[0].id : currentCat;
+  const sel = activeCatFor(mode, currentCat, cats);
   $("cat-tabs").innerHTML = cats.map(c =>
-    `<button data-cat="${c.id}" class="${c.id === currentCat ? "active" : ""}${c.id === "early" ? " early-pill" : ""}">${esc(catLabel(c))}</button>`).join("");
+    `<button data-cat="${c.id}" class="${c.id === sel ? "active" : ""}${c.id === "early" ? " early-pill" : ""}">${esc(catLabel(c))}</button>`).join("");
   $("cat-tabs").querySelectorAll("button").forEach(b =>
-    b.addEventListener("click", () => { currentCat = b.dataset.cat; renderTabs(); renderGrid(); }));
+    b.addEventListener("click", () => selectCategory(b.dataset.cat)));
+}
+// カテゴリチップのタップ。店内は従来どおり切り替えのみ。
+// テイクアウト／冷凍は選択を記録して商品を描き、商品の先頭までなめらかにスクロールする。
+function selectCategory(id) {
+  if (mode === "dinein") { currentCat = id; renderTabs(); renderGrid(); return; }
+  pickCat(mode, id);
+  renderTabs(); renderGrid();
+  scrollToItemGrid();
+}
+// 商品グリッドの先頭へなめらかにスクロールする。
+// スティッキーなカテゴリバーの高さ分は scroll-margin-top で逃がす（バーの高さはチップの折り返し行数で変わるため実測して当てる）。
+function scrollToItemGrid() {
+  const grid = $("item-grid");
+  if (!grid || typeof grid.scrollIntoView !== "function") return;
+  const tabs = $("cat-tabs");
+  if (tabs) grid.style.scrollMarginTop = `${tabs.offsetHeight + 10}px`;
+  requestAnimationFrame(() => grid.scrollIntoView({ behavior: "smooth", block: "start" }));
 }
 // ---------- 早割（事前予約専用）商品のゲート ----------
 // advanceOnly 商品は、受付開始日（fromDate）より前は一覧に出さない。受け取り日が当日の間は
@@ -182,19 +217,27 @@ function untilHidden(it) {
 }
 
 function renderGrid() {
-  const festivalOn = mode !== "frozen" && isAgeFestival(todayKey()); // 揚げピザ祭りの表示期間か（閲覧日ベース）
+  const selCat = activeCatFor(mode, currentCat, visibleCats());
   const banner = $("festival-banner");
+  if (selCat == null) {
+    // テイクアウト／冷凍でカテゴリ未選択の間は商品を出さない（メニュー入場直後の状態。本人要望 2026-11-28）
+    if (banner) banner.classList.add("hidden");
+    $("item-grid").classList.remove("wide");
+    $("item-grid").innerHTML = `<p class="note cat-pick-note">カテゴリを選ぶと商品が表示されます</p>`;
+    return;
+  }
+  const festivalOn = mode !== "frozen" && isAgeFestival(todayKey()); // 揚げピザ祭りの表示期間か（閲覧日ベース）
   if (banner) {
-    const showBanner = festivalOn && currentCat === AGE_FESTIVAL.cat;
+    const showBanner = festivalOn && selCat === AGE_FESTIVAL.cat;
     banner.classList.toggle("hidden", !showBanner);
     if (showBanner) banner.textContent = `${AGE_FESTIVAL.name}開催中！ 12月1日〜1月3日の期間限定です`;
   }
-  const items = (mode === "frozen" ? frozenItemsForCategory(currentCat) : itemsForCategory(currentCat))
+  const items = (mode === "frozen" ? frozenItemsForCategory(selCat) : itemsForCategory(selCat))
     .filter(m => !m.hidden && (mode === "dinein" || !m.dineInOnly) && (mode === "takeout" || !m.takeoutOnly)) // dineInOnly は店内のみ／takeoutOnly はテイクアウトのみ／hidden は常に出さない
     .filter(m => advanceStateOf(m) !== "hidden") // 早割商品は受付開始日より前は出さない
     .filter(m => !untilHidden(m)); // 販売終了日を過ぎた受け取り日では出さない
   // 早割メニューではポスターを大きく見せるため、1列の大型カードにする（サイドメニューでは通常サイズのまま）
-  const earlyView = mode === "takeout" && currentCat === "early";
+  const earlyView = mode === "takeout" && selCat === "early";
   $("item-grid").classList.toggle("wide", earlyView);
   $("item-grid").innerHTML = items.map(m => `
     <button class="item${earlyView ? " large" : ""}" data-id="${m.id}">
@@ -1396,7 +1439,7 @@ document.querySelectorAll(".guide-toggle").forEach(btn => {
 });
 
 $("go-order").addEventListener("click", () => {
-  setMode("takeout"); currentCat = earlyMenuVisible(todayKey()) ? "early" : "seasonal"; // 早割受付中は早割メニューを最初に開く（一番目立たせる）
+  setMode("takeout"); // カテゴリは未選択から始める（早割チップ自体は early-pill の見た目で目立たせる）
   // 日時が選択済みならそのままメニューへ。未選択なら最初に日時を選んでもらう
   if (pickupSel.takeout.time) { updatePickupBar(); renderTabs(); renderGrid(); show("scr-order"); }
   else startPickupFlow("menu");
@@ -1414,7 +1457,7 @@ function renderSeal() {
 $("seal-yes").addEventListener("click", () => { sealChoice = "need"; renderSeal(); });
 $("seal-no").addEventListener("click", () => { sealChoice = "none"; renderSeal(); });
 $("go-frozen").addEventListener("click", () => {
-  setMode("frozen"); currentCat = "fz-set";
+  setMode("frozen"); // テイクアウトと同じくカテゴリ未選択から始める
   if (pickupSel.frozen.time) { updatePickupBar(); renderTabs(); renderGrid(); show("scr-order"); }
   else startPickupFlow("menu");
 });
