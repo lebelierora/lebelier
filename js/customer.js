@@ -144,18 +144,17 @@ function toast(msg, ms = 1200) {
 }
 
 // ---------- メニュー ----------
-let currentCat = "seasonal"; // 店内モードの選択中カテゴリ（テイクアウト／冷凍は下の CAT-SELECT-LOGIC でモード別に保持）
 // ==== CAT-SELECT-LOGIC-BEGIN ====
-// テイクアウト／冷凍のカテゴリ選択状態（純粋ロジック。DOM・Firebase には触らない）
+// 全モード共通のカテゴリ選択状態（純粋ロジック。DOM・Firebase には触らない）
 // 2026-11-28 本人要望：メニュー入場直後はカテゴリ未選択にし、お客様がタップして初めて商品を出す。
+// テイクアウト／冷凍に先行導入し、同日の本人指摘で店内にも同じ仕様をそろえた。
 // 一度選んだらそのモードでは選択を保持する（詳細・カートから戻っても未選択には戻さない）。
-const pickedCat = { takeout: null, frozen: null }; // モード別に選んだカテゴリID（null = 未選択）
-function activeCatFor(m, dineinCat, cats) {
-  if (m === "dinein") return dineinCat;
+const pickedCat = { takeout: null, frozen: null, dinein: null }; // モード別に選んだカテゴリID（null = 未選択）
+function activeCatFor(m, cats) {
   const p = pickedCat[m];
   return p && cats.some(c => c.id === p) ? p : null; // 表示できないカテゴリが選ばれていたら未選択として扱う
 }
-function pickCat(m, id) { if (m === "takeout" || m === "frozen") pickedCat[m] = id; }
+function pickCat(m, id) { pickedCat[m] = id; }
 // ==== CAT-SELECT-LOGIC-END ====
 // カテゴリの表示名。お祭り期間中だけ対象カテゴリを祭り名に読み替える（データ側の名前は変えない）
 function catLabel(c) {
@@ -171,19 +170,16 @@ function visibleCats() {
 }
 function renderTabs() {
   const cats = visibleCats();
-  // 店内だけは従来どおり常にどれか1つが選択済み（表示できないカテゴリが選択中なら先頭へ）。
-  // テイクアウト／冷凍は未選択が正規の初期状態なので、ここでは先頭へ寄せない。
-  if (mode === "dinein" && !cats.some(c => c.id === currentCat)) currentCat = cats.length ? cats[0].id : currentCat;
-  const sel = activeCatFor(mode, currentCat, cats);
+  // 全モードとも未選択が正規の初期状態なので、ここでは先頭へ寄せない。
+  const sel = activeCatFor(mode, cats);
   $("cat-tabs").innerHTML = cats.map(c =>
     `<button data-cat="${c.id}" class="${c.id === sel ? "active" : ""}${c.id === "early" ? " early-pill" : ""}">${esc(catLabel(c))}</button>`).join("");
   $("cat-tabs").querySelectorAll("button").forEach(b =>
     b.addEventListener("click", () => selectCategory(b.dataset.cat)));
 }
-// カテゴリチップのタップ。店内は従来どおり切り替えのみ。
-// テイクアウト／冷凍は選択を記録して商品を描き、商品の先頭までなめらかにスクロールする。
+// カテゴリチップのタップ（全モード共通）。
+// 選択を記録して商品を描き、商品の先頭までなめらかにスクロールする。
 function selectCategory(id) {
-  if (mode === "dinein") { currentCat = id; renderTabs(); renderGrid(); return; }
   pickCat(mode, id);
   renderTabs(); renderGrid();
   scrollToItemGrid();
@@ -217,10 +213,10 @@ function untilHidden(it) {
 }
 
 function renderGrid() {
-  const selCat = activeCatFor(mode, currentCat, visibleCats());
+  const selCat = activeCatFor(mode, visibleCats());
   const banner = $("festival-banner");
   if (selCat == null) {
-    // テイクアウト／冷凍でカテゴリ未選択の間は商品を出さない（メニュー入場直後の状態。本人要望 2026-11-28）
+    // カテゴリ未選択の間は商品を出さない（メニュー入場直後の状態。全モード共通。本人要望 2026-11-28）
     if (banner) banner.classList.add("hidden");
     $("item-grid").classList.remove("wide");
     $("item-grid").innerHTML = `<p class="note cat-pick-note">カテゴリを選ぶと商品が表示されます</p>`;
