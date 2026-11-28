@@ -10,7 +10,7 @@ import {
   signInWithEmailAndPassword, onAuthStateChanged, signOut,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  todayKey, addDays, isThursday, formatDateJP, lastSlot, toMin, toHHMM, occupiedTime, esc, yen, seatLabel,
+  todayKey, addDays, isThursday, formatDateJP, lastSlot, toMin, toHHMM, occupiedTime, esc, yen, SEATS, seatLabel,
 } from "./menu.js?v=20251127-116";
 
 const $ = id => document.getElementById(id);
@@ -491,6 +491,91 @@ function printsOnArrival(o, todayStr) {
 }
 // ==== ARRIVAL-PRINT-LOGIC-END ====
 
+// ==== SEAT-GATE-LOGIC-BEGIN ====
+// 席の開始ゲート（2026-11-28 本人決定）: 店内注文は、厨房が「席の受付」を開けている間だけ
+// 受け付ける。席セッションは Firestore の seatSessions/{席ID} =
+// { open, gen, openedAt, lastClosedGen }。gen は席を開けるたびに増える「来店回」の番号で、
+// お客様の注文・呼び出しには注文時点の gen が記録される。
+// 開けてから3時間を超えたセッションは、閉じ忘れ対策として無効（閉じている）扱いにする。
+// ※ js/customer.js にも同じ判定（TTL・開局判定）がある。両者は必ず一致させること。
+const SEAT_SESSION_TTL_MS = 3 * 60 * 60 * 1000; // 3時間
+function seatOpenedMs(sess) {
+  if (!sess || sess.openedAt == null) return null;
+  if (typeof sess.openedAt.toMillis === "function") return sess.openedAt.toMillis();
+  const n = Number(sess.openedAt);
+  return Number.isFinite(n) ? n : null;
+}
+function seatSessionOpen(sess, nowMs) {
+  if (!sess || sess.open !== true) return false;
+  const opened = seatOpenedMs(sess);
+  if (opened == null) return true; // openedAt がまだ確定していない（開けた直後）は開いている扱い
+  return nowMs - opened <= SEAT_SESSION_TTL_MS;
+}
+// 注文／呼び出しの gen が正規の来店回のものか: 現在開いている来店回と一致するか、
+// 会計で閉じた直後の来店回（lastClosedGen）と一致すれば正規として扱う
+// （閉じた直後に遅れて届いた注文も拾うため）。
+function seatGateAccepts(orderGen, sess, nowMs) {
+  if (typeof orderGen !== "number" || !sess) return false;
+  if (seatSessionOpen(sess, nowMs) && sess.gen === orderGen) return true;
+  if (typeof sess.lastClosedGen === "number" && sess.lastClosedGen === orderGen) return true;
+  return false;
+}
+// ==== SEAT-GATE-LOGIC-END ====
+
+// 席セッションの状態（seatSessions のスナップショット）とゲート稼働フラグ。
+// seatGateReady が false の間（Firestore ルールへの seatSessions 追加が未配備で
+// 読み込めていない間）は、ゲートを効かせず従来どおり全件を受け付ける・印刷する。
+let seatSessions = {}; // 席ID -> セッションデータ
+let seatGateReady = false;
+// ゲート判定の入口: ゲート未稼働の間は常に true（従来動作）。
+function seatGateOkFor(seatId, gen) {
+  if (!seatGateReady) return true;
+  return seatGateAccepts(gen, seatSessions[seatId], Date.now());
+}
+
+// ---------- 席パネル（席の開始ゲート） ----------
+// 厨房画面上部の席チップ。タップで受付の開始／終了を切り替える。
+// 開始すると gen が+1され、終了すると閉じた gen が lastClosedGen に残る。
+function renderSeatPanel() {
+  const box = $("seat-chips");
+  if (!box) return;
+  const now = Date.now();
+  box.innerHTML = SEATS.map(s => {
+    const sess = seatSessions[s.id];
+    const open = seatGateReady && seatSessionOpen(sess, now);
+    const expired = seatGateReady && !!sess && sess.open === true && !seatSessionOpen(sess, now);
+    const state = open ? "受付中" : expired ? "期限切れ" : "受付なし";
+    return `<button type="button" class="seat-chip ${open ? "open" : ""}" data-seat-toggle="${s.id}">${esc(s.label)}<span class="seat-state">${state}</span></button>`;
+  }).join("");
+  box.querySelectorAll("[data-seat-toggle]").forEach(b =>
+    b.addEventListener("click", () => toggleSeat(b.dataset.seatToggle)));
+  const note = $("seat-panel-note");
+  if (note) {
+    note.textContent = seatGateReady
+      ? "席をタップすると店内注文の受付を開始／終了します。受付していない席からは注文できず、伝票も出ません。会計が済んだら席を閉じてください（開けてから3時間で自動的に無効になります）。"
+      : "⚠ 席ゲートの状態を取得できていません。Firestore ルールに seatSessions の許可追加が必要です。それまでは従来どおり全席の注文を受け付けます。";
+  }
+}
+async function toggleSeat(seatId) {
+  const sess = seatSessions[seatId] || null;
+  const isOpen = seatSessionOpen(sess, Date.now());
+  try {
+    if (isOpen) {
+      if (!confirm(`${seatLabel(seatId)}の受付を終了しますか？\nこの席からは注文できなくなります。会計が済んでから閉じてください。`)) return;
+      await setDoc(doc(db, "seatSessions", seatId),
+        { open: false, lastClosedGen: typeof sess.gen === "number" ? sess.gen : null }, { merge: true });
+    } else {
+      const nextGen = (sess && typeof sess.gen === "number" ? sess.gen : 0) + 1;
+      await setDoc(doc(db, "seatSessions", seatId),
+        { open: true, gen: nextGen, openedAt: serverTimestamp() }, { merge: true });
+    }
+  } catch (e) {
+    console.error("席セッションの切り替えに失敗", e);
+    alert("席の受付状態の変更に失敗しました。通信環境をご確認のうえ、もう一度お試しください。");
+  }
+}
+renderSeatPanel();
+
 // ==== AUTO-ACCEPT-LOGIC-BEGIN ====
 // 事前予約の自動受付の対象判定（純粋関数）。受け取りが翌日以降のテイクアウト・冷凍は、
 // 厨房が受付ボタンを押さなくても、注文が入った時点で自動的に受付（確定）にする
@@ -506,7 +591,9 @@ function autoAcceptOnArrival(o, todayStr) {
 // PassPRNT は戻るたびにページが再読み込みされるため、先頭の1件だけを対象にする。
 function maybeAutoPrintDinein() {
   const targets = dineinOrders
-    .filter(o => o.status === "pending" && !o.printedAt)
+    // 席の開始ゲート: ゲート稼働中は、来店回（gen）が一致する注文だけ自動印刷する。
+    // 一致しない注文は印刷せず、カードに警告を出して店主の判断（却下／手動印刷）に委ねる。
+    .filter(o => o.status === "pending" && !o.printedAt && seatGateOkFor(o.seat, o.gen))
     .sort((a, b) => tsMillis(a.createdAt) - tsMillis(b.createdAt));
   if (printRoute() === "cloud") targets.forEach(o => launchPrintCloud("dinein", o, true));
   else if (targets[0]) launchPrintPassPrnt("dinein", targets[0], true);
@@ -704,12 +791,26 @@ function startListeners() {
     render();
     maybeAutoPrintDinein(); // 店内注文は入った瞬間に伝票を出す
   });
+  onSnapshot(collection(db, "seatSessions"), snap => {
+    seatSessions = {};
+    snap.docs.forEach(d => { seatSessions[d.id] = d.data(); });
+    seatGateReady = true;
+    renderSeatPanel();
+    render(); // 注文カードのゲート警告表示を最新の席状態で描き直す
+    renderCalls();
+  }, e => {
+    // ルール未配備などで読み込めない間はゲートを効かせない（従来動作にフォールバック）
+    console.error("席セッションの購読に失敗", e);
+    seatGateReady = false;
+    renderSeatPanel();
+  });
   onSnapshot(query(collection(db, "calls"), where("status", "==", "open")), snap => {
     calls = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => tsMillis(a.createdAt) - tsMillis(b.createdAt));
     const ids = new Set(calls.map(c => c.id));
     if (startedCalls) {
-      for (const c of calls) if (!knownCalls.has(c.id)) playCallSound(c.purpose, c.custom);
+      // 席の開始ゲート: 来店回が一致しない呼び出しは音を鳴らさず、警告として表示する
+      for (const c of calls) if (!knownCalls.has(c.id) && seatGateOkFor(c.seat, c.gen)) playCallSound(c.purpose, c.custom);
     }
     knownCalls = ids;
     startedCalls = true;
@@ -721,10 +822,11 @@ function startListeners() {
   });
   watchTodayStop();
   // カウントダウン更新＋日付が変わったら停止フラグの購読先（その日の daySlots）を張り替える
-  setInterval(() => { render(); if (todayKey() !== stopDateKey) watchTodayStop(); }, 30000);
+  setInterval(() => { render(); renderSeatPanel(); if (todayKey() !== stopDateKey) watchTodayStop(); }, 30000);
   // 未受付がある間は繰り返し知らせる。両方あるときは「呼び出しの声 → 注文の声」の順でキューに入れる
   setInterval(() => {
-    if (calls.length > 0) playCallSound(calls[0].purpose, calls[0].custom); // 一番長く待っている呼び出しの用件で知らせる
+    const firstCall = calls.find(c => seatGateOkFor(c.seat, c.gen)); // ゲート不一致の呼び出しは繰り返し通知でも鳴らさない
+    if (firstCall) playCallSound(firstCall.purpose, firstCall.custom); // 一番長く待っている呼び出しの用件で知らせる
     if (orders.some(o => o.status === "pending" && isVisible(o)) ||
         dineinOrders.some(o => o.status === "pending")) playSound();
   }, 4000);
@@ -813,7 +915,7 @@ function activeDinein() {
     .sort((a, b) => tsMillis(a.createdAt) - tsMillis(b.createdAt));
 }
 function finishedDinein() {
-  return dineinOrders.filter(o => o.status === "done")
+  return dineinOrders.filter(o => o.status === "done" || o.status === "cancelled")
     .sort((a, b) => tsMillis(b.createdAt) - tsMillis(a.createdAt));
 }
 // 店内＋テイクアウトの統合表示リスト（タブで絞り込み）
@@ -932,7 +1034,9 @@ function renderStats() {
 // ---------- 店内オーダーのカード ----------
 function dineinCardHtml(o) {
   const isPending = o.status === "pending";
-  const stLabel = o.status === "pending" ? "確認待ち" : o.status === "accepted" ? "受付済み" : "提供済み";
+  const stLabel = o.status === "pending" ? "確認待ち" : o.status === "accepted" ? "受付済み" : o.status === "cancelled" ? "取り消し" : "提供済み";
+  // 席の開始ゲート: 来店回（gen）が一致しない確認待ち注文は自動印刷せず、警告と却下ボタンを出す
+  const gateNg = seatGateReady && isPending && !seatGateAccepts(o.gen, seatSessions[o.seat], Date.now());
   return `<div class="kcard ${isPending ? "pending" : ""}">
     <div>
       <div class="pdate"><span class="kind-chip">店内</span> ／ ${stLabel}</div>
@@ -941,6 +1045,11 @@ function dineinCardHtml(o) {
     </div>
     <div>${itemsHtml(o)}</div>
     <div class="ktotal">合計 ${yen(o.total)}</div>
+    ${gateNg ? `
+    <div class="print-warn">⚠ 受付外の注文です（席が開いていない時間帯の注文の可能性があります）</div>
+    <div class="act-row">
+      <button class="btn ghost" data-dreject="${o.id}">却下する（取り消し）</button>
+    </div>` : ""}
     ${printBlockHtml("dinein", o)}
     ${isPending ? `
     <div class="act-row">
@@ -961,6 +1070,12 @@ function bindDineinButtons() {
     b.disabled = true;
     await updateDoc(doc(db, "dineInOrders", b.dataset.ddone), { status: "done", doneAt: serverTimestamp() });
   }));
+  // 席の開始ゲートで弾いた注文の却下（取り消し）。完了リスト側に「取り消し」として残る
+  document.querySelectorAll("[data-dreject]").forEach(b => b.addEventListener("click", async () => {
+    if (!confirm("この注文を却下（取り消し）にしますか？")) return;
+    b.disabled = true;
+    await updateDoc(doc(db, "dineInOrders", b.dataset.dreject), { status: "cancelled", cancelledAt: serverTimestamp() });
+  }));
 }
 
 // ---------- 呼び出し ----------
@@ -974,6 +1089,8 @@ function renderCalls() {
       <div style="font-weight:800;">${c.custom
         ? `<span class="kind-chip">ご要望</span> ${esc(c.purpose || "")}`
         : (c.purpose && c.purpose !== "通常の呼び出し" ? esc(c.purpose) : "店員を呼んでいます")}</div>
+      ${seatGateReady && !seatGateAccepts(c.gen, seatSessions[c.seat], Date.now())
+        ? `<div class="print-warn">⚠ 受付外の呼び出しです（席が開いていない時間帯の呼び出しの可能性があります）</div>` : ""}
       <div class="act-row">
         <button class="btn" data-call-done="${c.id}">対応した</button>
       </div>

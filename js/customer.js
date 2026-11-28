@@ -1314,6 +1314,76 @@ function renderStatusResults() {
       }));
 }
 
+// ==== SEAT-GATE-LOGIC-BEGIN ====
+// 席の開始ゲート（2026-11-28 本人決定）: 店内注文は、厨房が「席の受付」を開けている間だけ
+// 受け付ける。席に置いた固定QRを写真に撮った人が、帰宅後に空席へ注文するような
+// 受付外の注文を防ぐための仕組み。
+// 席セッションは Firestore の seatSessions/{席ID} = { open, gen, openedAt, lastClosedGen }。
+// gen は席を開けるたびに増える「来店回」の番号。お客様ページは店内に入った時点の gen を
+// 保持し、送信時に読み直して一致を確認する（前の来店回に開いたままのページからの
+// 誤送信・いたずら送信も防ぐ）。開けてから3時間を超えたセッションは、閉じ忘れ対策として
+// 無効（閉じている）扱いにする。
+// ※ js/kitchen.js にも同じ判定（TTL・開局判定）がある。両者は必ず一致させること。
+const SEAT_SESSION_TTL_MS = 3 * 60 * 60 * 1000; // 3時間
+function seatOpenedMs(sess) {
+  if (!sess || sess.openedAt == null) return null;
+  if (typeof sess.openedAt.toMillis === "function") return sess.openedAt.toMillis();
+  const n = Number(sess.openedAt);
+  return Number.isFinite(n) ? n : null;
+}
+function seatSessionOpen(sess, nowMs) {
+  if (!sess || sess.open !== true) return false;
+  const opened = seatOpenedMs(sess);
+  if (opened == null) return true; // openedAt がまだ確定していない（開けた直後）は開いている扱い
+  return nowMs - opened <= SEAT_SESSION_TTL_MS;
+}
+// 送信可否の判定: "ok"（送信可）/ "closed"（席が開いていない・期限切れ）/ "gen"（来店回が切り替わった）
+function seatGateCheck(sess, heldGen, nowMs) {
+  if (!seatSessionOpen(sess, nowMs)) return "closed";
+  if (sess.gen !== heldGen) return "gen";
+  return "ok";
+}
+// ==== SEAT-GATE-LOGIC-END ====
+
+// 席の開始ゲート: 店内に入った時点の来店回（gen）を保持し、送信時に読み直して照合する。
+let heldSeatGen = null;     // 保持した gen（席セッションが無い／読めなかった場合は null）
+let heldSeatGenSeat = null; // heldSeatGen を取得した席ID
+const SEAT_GATE_MSG = {
+  closed: "ご注文の準備中です。スタッフにお声がけください。",
+  gen: "お席の受付が切り替わりました。お手数ですが、席のQRコードを読み直すか、このページを開き直してください。",
+};
+async function captureSeatGen() {
+  heldSeatGenSeat = seat;
+  heldSeatGen = null;
+  if (!seat) return;
+  try {
+    const snap = await withTimeout(getDoc(doc(db, "seatSessions", seat)), SUBMIT_CHECK_TIMEOUT_MS);
+    if (snap.exists()) heldSeatGen = snap.data().gen ?? null;
+  } catch (e) {
+    // 読めない場合は null のままにする（送信時に読み直して判定する。読み取り自体の失敗では送信を止めない）
+    console.error("席セッションの取得に失敗", e);
+  }
+}
+// 送信直前のゲート確認。{ ok: true } か { ok: false, reason: "closed" | "gen" } を返す。
+// seatSessions の読み取り自体が失敗した場合は注文を止めない（Firestore ルールへの
+// seatSessions 追加が未配備の間や通信不良のときに、店内注文が全面的に止まるのを防ぐため。
+// その間も厨房側の印刷ゲートと二重に守る）。
+async function checkSeatGate() {
+  let snap;
+  try {
+    snap = await withTimeout(getDoc(doc(db, "seatSessions", seat)), SUBMIT_CHECK_TIMEOUT_MS);
+  } catch (e) {
+    console.error("席セッションの確認に失敗（ゲート判定をスキップ）", e);
+    return { ok: true, skipped: true };
+  }
+  const sess = snap.exists() ? snap.data() : null;
+  const held = heldSeatGenSeat === seat ? heldSeatGen : null;
+  const r = seatGateCheck(sess, held, Date.now());
+  return r === "ok" ? { ok: true } : { ok: false, reason: r };
+}
+// この端末が保持している gen（注文・呼び出しドキュメントに記録する）
+function mySeatGen() { return heldSeatGenSeat === seat ? heldSeatGen : null; }
+
 // ---------- 店内オーダー ----------
 function renderSeatGrid() {
   $("seat-grid").innerHTML = SEATS.map(s =>
@@ -1329,6 +1399,7 @@ function enterDinein() {
 function enterDineinMenu() {
   $("dinein-seat-label").textContent = seatLabel(seat);
   $("call-msg-order").textContent = "";
+  captureSeatGen(); // 席の開始ゲート: この時点の来店回（gen）を保持する
   renderTabs(); renderGrid();
   show("scr-order");
 }
@@ -1389,6 +1460,10 @@ async function submitDinein() {
   const btn = $("submit-dinein");
   btn.disabled = true; btn.textContent = "送信中…";
   try {
+    // 席の開始ゲート: 厨房が席を開けていて、来店回（gen）がこのページを開いた時点と
+    // 一致する場合だけ注文を受け付ける。通らなければ注文は書き込まない。
+    const gate = await checkSeatGate();
+    if (!gate.ok) { err(SEAT_GATE_MSG[gate.reason]); return; }
     const items = cart.map(c => {
       const it = anyById(c.itemId);
       const up = unitPrice(it, c.toppings, null, c.choice);
@@ -1403,6 +1478,7 @@ async function submitDinein() {
     try {
       await withTimeout(setDoc(ref, {
         orderNo, seat, seatLabel: seatLabel(seat),
+        gen: mySeatGen(), // 席の開始ゲート: 注文した来店回（厨房側の印刷ゲートで照合する）
         items, total: cartTotal(), totalQty: cartQty(),
         status: "pending",
         createdAt: serverTimestamp(),
@@ -1480,11 +1556,15 @@ function openCallModal(msgEl) {
 async function callStaff(msgEl, purpose, custom) {
   if (!seat) { msgEl.textContent = "先にお席をお選びください。"; return; }
   if (callBusy) return;
+  // 席の開始ゲート: 注文と同じ確認を通らなければ呼び出しも送らない
+  const gate = await checkSeatGate();
+  if (!gate.ok) { msgEl.textContent = SEAT_GATE_MSG[gate.reason]; return; }
   callBusy = true;
   try {
     // 送信と同じ固まり対策: タイムアウトで必ず settle させ、下の callBusy 解除まで到達させる
     await withTimeout(addDoc(collection(db, "calls"), {
       seat, seatLabel: seatLabel(seat), status: "open",
+      gen: mySeatGen(), // 席の開始ゲート: 呼び出した来店回（厨房側の着信ゲートで照合する）
       purpose: purpose || "通常の呼び出し",
       ...(custom ? { custom: true } : {}),
       createdAt: serverTimestamp(),
