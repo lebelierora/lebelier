@@ -332,11 +332,19 @@ export function leadMinutes(totalQty) {
 }
 
 // 受け取り時刻の候補（10分刻み）を返す。休業日（木曜定休・年始休業など）は空配列。
-export function timeSlots(key, totalQty) {
+// kind は "takeout" | "frozen"（省略時はテイクアウト以外＝従来どおりの扱い）。
+// テイクアウトの受け取り開始は、開店ぴったりの時刻に大量注文が入ると作り切れないための
+// 救済措置として、既定の開店時刻（11:00）の30分後からにする（本人決定 2026-11-28）。
+// 当日・翌日以降とも同じ。当日はリードタイム（leadMinutes）と両方を満たす遅い方を取る。
+// ただし DATE_OVERRIDES の first は「その日の最初の受け取り枠」そのものの明示指定なので、
+// 明示がある日はテイクアウトでもその時刻をそのまま使う（例：12/22 は 13:00 開始のまま）。
+// 冷凍は「できているものを渡すだけ」なので、明示がない日も開店時刻から（従来どおり）。
+export function timeSlots(key, totalQty, kind) {
   if (isClosedDay(key)) return [];
   const last = toMin(lastSlot(key));
   const ov = dateOverride(key);
-  const first = ov && ov.first ? toMin(ov.first) : 11 * 60; // 例外日の開店時刻（例：12/22は13:00）
+  const openFirst = ov && ov.first ? toMin(ov.first) : 11 * 60; // 明示がなければ開店時刻、あればその日の最初の受け取り枠
+  const first = kind === "takeout" && !(ov && ov.first) ? openFirst + 30 : openFirst;
   let start;
   if (key === todayKey()) {
     const n = jstNowParts();

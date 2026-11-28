@@ -8,7 +8,7 @@ import {
   todayKey, addDays, formatDateJP, isClosedDay, closedReason, timeSlots, leadMinutes,
   normalizePhone, esc, yen, SEATS, seatLabel, toMin, bookingEndKey, advanceGate,
   AGE_FESTIVAL, isAgeFestival, earlyMenuVisible,
-} from "./menu.js?v=20251127-118";
+} from "./menu.js?v=20251128-119";
 import {
   FROZEN_CATEGORIES, frozenById, frozenItemsForCategory,
 } from "./frozen-menu.js?v=20251127-115";
@@ -667,7 +667,7 @@ function pickupProblemSync() {
     const lim = fmtShort(untilItem.untilDate);
     return { type: "until", message: `${untilItem.name}は${lim}までの販売です。日時を${lim}までに変更するか、カートから外してください。` };
   }
-  if (mode === "takeout" && p.date === todayKey() && !timeSlots(p.date, cartQty()).includes(p.time)) {
+  if (mode === "takeout" && p.date === todayKey() && !timeSlots(p.date, cartQty(), "takeout").includes(p.time)) {
     const lead = leadMinutes(cartQty());
     return { type: "lead", message: cartQty() >= 5
       ? `ご注文点数が増えたため、受け取り時刻 ${p.time} では注文できません。最短で${lead}分後以降の時刻をお選びください。`
@@ -680,7 +680,7 @@ function checkLeadCrossing() {
   if (mode !== "takeout" || currentScreen !== "scr-order") return;
   const p = pickupSel.takeout;
   if (!p || p.date !== todayKey() || !p.time) { leadWarned = false; return; }
-  const invalid = !timeSlots(p.date, cartQty()).includes(p.time);
+  const invalid = !timeSlots(p.date, cartQty(), "takeout").includes(p.time);
   if (invalid && !leadWarned) {
     leadWarned = true;
     toast("点数が増えたため、受け取り時刻を選び直す必要があります", 2600);
@@ -836,7 +836,7 @@ function renderCart() {
   updateSetNotes();
 }
 function renderSlots() {
-  const slots = timeSlots(selDate, cartQty());
+  const slots = timeSlots(selDate, cartQty(), mode);
   // 厨房が本日のテイクアウト受付を止めている間は、当日枠を全て「受付終了」にする（将来日・冷凍は対象外）
   const stoppedToday = mode === "takeout" && selDate === todayKey() && slotDocStopped;
   if (stoppedToday) selTime = null;
@@ -849,7 +849,7 @@ function renderSlots() {
     ? (cartQty() >= 5 ? `ご注文点数が多いため、最短で${lead}分後からの受け取りになります。` : `最短で${lead}分後からの受け取りになります。`)
     : slots.length > 0
     ? `この日のお受け取りは ${slots[0]}〜${slots[slots.length - 1]} の間でお選びください。`
-    : "営業時間内（11:00〜最終受け取り 月〜土19:30／日曜17:30）でお選びください。";
+    : "営業時間内（最終受け取り 月〜土19:30／日曜17:30）でお選びください。";
   // 既に注文が入っている枠（1枠1注文）は選べないようにする。受付停止中は当日枠の全部が対象
   $("slot-grid").innerHTML = slots.map(s => {
     const full = occupiedTimes.has(s) || stoppedToday;
