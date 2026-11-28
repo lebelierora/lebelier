@@ -173,49 +173,105 @@ function buildTicketHtml(kind, o) {
 }
 
 // 伝票（CloudPRNT用プレーンテキスト・80mm）。内容・並びは buildTicketHtml と同じ。
-// HTML の文字サイズの強弱は再現できないため、区切り線と空行で代替する。
-// 長い商品名はプリンター側の折り返しに任せる。
-function ticketItemsText(o) {
-  return (o.items || []).map(i => {
+// 文字サイズは HTML 版の px 配分に合わせ、Star Line の拡大コマンド（ESC i）で
+// 行ごとに切り替える。太字は ESC E / ESC F を使う（実機未検証。効かなくても
+// 印字内容・位置に影響しないよう、拡大コマンドとは独立に挟む）。
+// 拡大・強調は必ず行の中で開始・解除を完結させ（行頭で開始し改行前に両方解除）、
+// 伝票の末尾は通常サイズに戻してから空行を付ける（次の伝票への拡大漏れ防止）。
+const TICKET_ESC = "\x1B";
+const TICKET_SIZE_PARAM = { wide: [1, 0], big: [1, 1], tall: [0, 1] }; // ESC i の [横, 縦]（倍率-1）
+const TICKET_SIZE_BUDGET = { normal: 48, wide: 24, big: 24, tall: 48 }; // 印字幅の予算（SJIS幅: 全角2・半角1）
+
+// 伝票の1論理行: { t: 本文, size: normal|wide|big|tall, bold, center }
+function tline(t, size = "normal", bold = false, center = false) {
+  return { t, size, bold, center };
+}
+// 文字列の印字幅（SJIS のバイト数＝幅単位。SJIS に無い文字は "?" の1単位）
+function ticketTextWidth(s) {
+  return encodeSjisBytes(s).length;
+}
+// 幅予算で折り返す（文字の途中では割らない。折り返し2行目以降も字下げなし）
+function wrapTicketLine(text, budget) {
+  const chunks = [];
+  let cur = "", w = 0;
+  for (const ch of text) {
+    const cw = ticketTextWidth(ch);
+    if (cur && w + cw > budget) { chunks.push(cur); cur = ""; w = 0; }
+    cur += ch; w += cw;
+  }
+  chunks.push(cur);
+  return chunks;
+}
+// 1論理行を印字用文字列にする。拡大・強調は各物理行の中で開始・解除を完結させる。
+function renderTicketLine(spec) {
+  if (!spec.t) return "";
+  const budget = TICKET_SIZE_BUDGET[spec.size];
+  const p = TICKET_SIZE_PARAM[spec.size];
+  const head = (p ? TICKET_ESC + "i" + String.fromCharCode(p[0], p[1]) : "") + (spec.bold ? TICKET_ESC + "E" : "");
+  const tail = (spec.bold ? TICKET_ESC + "F" : "") + (p ? TICKET_ESC + "i\x00\x00" : "");
+  return wrapTicketLine(spec.t, budget).map(chunk => {
+    let s = chunk;
+    if (spec.center) {
+      const pad = Math.floor((budget - ticketTextWidth(chunk)) / 2);
+      if (pad > 0) s = " ".repeat(pad) + s;
+    }
+    return head + s + tail;
+  }).join("\n");
+}
+function ticketItemLines(o) {
+  const out = [];
+  for (const i of o.items || []) {
     const custom = [i.cut ? (i.cut === "cut4" ? "4カット" : i.cut === "cut6" ? "6カット" : "未カット") : null,
                     i.pack ? (i.pack === "box" ? "箱" : "紙皿・ホイル") : null,
                     i.choice || null,
                     ...(i.toppings || [])].filter(Boolean).join("／");
-    const lines = [`${i.name} × ${i.qty}`];
-    if (custom) lines.push(`　${custom}`);
+    out.push(tline(`${i.name} × ${i.qty}`, "wide", true));
+    if (custom) out.push(tline(`　${custom}`));
     // HTML 版と同じく、伝票では提供タイミングを既定でも常時表示し、旧文言「できた順」は「でき次第」に読み替える
-    if (i.timing) lines.push(`　提供：${i.timing === "できた順" ? "でき次第" : i.timing}`);
-    return lines.join("\n");
-  }).join("\n");
+    if (i.timing) out.push(tline(`　提供：${i.timing === "できた順" ? "でき次第" : i.timing}`, "normal", true));
+  }
+  return out;
+}
+function ticketItemsText(o) {
+  return ticketItemLines(o).map(l => l.t).join("\n");
 }
 function buildTicketText(kind, o) {
-  let head, sub;
+  let head, sub, subSize;
   if (kind === "dinein") {
     head = "店内注文";
     sub = o.seatLabel || seatLabel(o.seat);
+    subSize = "big"; // 座席名は縦横2倍
   } else if (o.kind === "frozen") {
     head = "冷凍";
     sub = `受け取り ${formatDateJP(o.confirmedDate || o.pickupDate)} ${o.confirmedPickup || o.requestedPickup || ""}`;
+    subSize = "tall"; // 受け取り日時は横2倍では1行に収まらないため縦だけ2倍
   } else {
     head = "テイクアウト";
     sub = `受け取り ${formatDateJP(o.pickupDate)} ${o.confirmedPickup || o.requestedPickup || ""}`;
+    subSize = "tall";
   }
   const dineinTime = tsSortKey(o.createdAt);
-  const lines = ["るべりえ", head, sub, "--------------------------------"];
+  const specs = [
+    tline("るべりえ", "wide", true, true),
+    tline(head, "big", true, true),
+    tline(sub, subSize, true, true),
+    tline("--------------------------------"),
+  ];
   if (kind === "dinein") {
-    lines.push(`注文番号 ${orderCodeFromId(o.id)}`);
-    if (!dineinTime.startsWith("9999")) lines.push(`注文時刻 ${dineinTime.slice(11)}`);
+    specs.push(tline(`注文番号 ${orderCodeFromId(o.id)}`, "big", true));
+    if (!dineinTime.startsWith("9999")) specs.push(tline(`注文時刻 ${dineinTime.slice(11)}`));
   } else {
-    lines.push(`${o.name || ""} 様`, `注文番号 ${orderCodeFromId(o.id)}`);
+    specs.push(tline(`${o.name || ""} 様`, "wide", true), tline(`注文番号 ${orderCodeFromId(o.id)}`, "big", true));
   }
-  lines.push("--------------------------------", ticketItemsText(o));
-  if (o.setMeal) lines.push("平日セット対象：揚げ物をサービスで付ける");
-  if (o.note) lines.push(`備考：${o.note}`);
+  const itemLines = ticketItemLines(o);
+  specs.push(tline("--------------------------------"), ...(itemLines.length ? itemLines : [tline("")]));
+  if (o.setMeal) specs.push(tline("平日セット対象：揚げ物をサービスで付ける", "normal", true));
+  if (o.note) specs.push(tline(`備考：${o.note}`));
   if (o.kind === "frozen" && o.seal) {
-    lines.push(`温め方シール：${o.seal === "none" ? "不要（貼らない）" : "必要（各商品に貼る）"}`);
+    specs.push(tline(`温め方シール：${o.seal === "none" ? "不要（貼らない）" : "必要（各商品に貼る）"}`, "normal", true));
   }
-  lines.push("--------------------------------", `合計 ${yen(o.total)}`, "", "");
-  return lines.join("\n").replace(/\r/g, "");
+  specs.push(tline("--------------------------------"), tline(`合計 ${yen(o.total)}`, "wide", true), tline(""), tline(""));
+  return specs.map(renderTicketLine).join("\n").replace(/\r/g, "");
 }
 // ==== PRINT-TICKET-END ====
 
