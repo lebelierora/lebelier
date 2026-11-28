@@ -72,7 +72,8 @@ let stopUnsub = null;
 // プリンター：スター精密 mC-Print3（TCP:192.168.11.40／80mm）。
 // 経路は2つ：CloudPRNT（Worker 経由・画面切り替えなし）が本経路、PassPRNT（アプリ経由）が予備経路。
 // localStorage の printRoute（"cloud" | "pass"、既定 "cloud"）で切り替え、厨房画面のトグルでも変更できる。
-// タイミング（本人の決定）：店内注文は注文が入った瞬間、テイクアウト・冷凍は厨房で確定した瞬間。呼び出しは印刷しない。
+// タイミング（本人の決定）：店内注文は注文が入った瞬間。テイクアウト・冷凍は受け取りが
+// 翌日以降なら注文が入った時点、当日受け取りなら厨房で確定した瞬間。呼び出しは印刷しない。
 // どちらの経路でも、印刷済みフラグ（printedAt）を出す前に Firestore へ記録しておくことが
 // 二重印刷・ループ防止の要（PassPRNT は戻りURLでこのページが再読み込みされるため特に重要）。
 // CloudPRNT の受け口は http（プリンターが https ではこの宛先に接続できないため実機確認のうえ http）。
@@ -473,6 +474,20 @@ function launchPrint(kind, o, isAuto) {
                                   : launchPrintPassPrnt(kind, o, isAuto);
 }
 
+// ==== ARRIVAL-PRINT-LOGIC-BEGIN ====
+// 到着時自動印刷の対象判定（純粋関数）。テイクアウト・冷凍は、実効受け取り日
+// （confirmedDate があればそれ、なければ pickupDate）が JST の今日より後なら、
+// 確定を待たず注文が入った時点で印刷する。当日受け取りは対象外（当日は時刻の
+// 調整が入るため、従来どおり確定した瞬間に印刷する）。冷凍は受け取りが常に
+// 翌々日以降なので、この日付ルールで常に到着時印刷になる。
+// 日付キーは YYYY-MM-DD 形式なので、文字列比較で前後を判定できる。
+function printsOnArrival(o, todayStr) {
+  if (!o || !todayStr) return false;
+  const date = o.confirmedDate || o.pickupDate || "";
+  return !!date && date > todayStr;
+}
+// ==== ARRIVAL-PRINT-LOGIC-END ====
+
 // 店内注文の自動印刷：未印刷の確認待ちを来た順に試みる。
 // CloudPRNT は画面遷移がないので全件まとめて投入し、Worker 側の FIFO に任せる。
 // PassPRNT は戻るたびにページが再読み込みされるため、先頭の1件だけを対象にする。
@@ -482,6 +497,19 @@ function maybeAutoPrintDinein() {
     .sort((a, b) => tsMillis(a.createdAt) - tsMillis(b.createdAt));
   if (printRoute() === "cloud") targets.forEach(o => launchPrintCloud("dinein", o, true));
   else if (targets[0]) launchPrintPassPrnt("dinein", targets[0], true);
+}
+
+// テイクアウト・冷凍の到着時自動印刷：受け取りが翌日以降の注文は、確定を待たず
+// 入った時点で伝票を出す（店内と同じ扱い）。当日受け取りは対象外（確定時に印刷）。
+// 厨房ページを開いたときに初めて目にする未印刷の該当注文もここで拾う（店内と同じ挙動）。
+// 経路別の投入方針も店内にそろえる（CloudPRNT は全件、PassPRNT は先頭1件）。
+function maybeAutoPrintTakeout() {
+  const tk = todayKey();
+  const targets = orders
+    .filter(o => (o.status === "pending" || o.status === "confirmed") && !o.printedAt && printsOnArrival(o, tk))
+    .sort((a, b) => tsMillis(a.createdAt) - tsMillis(b.createdAt));
+  if (printRoute() === "cloud") targets.forEach(o => launchPrintCloud("takeout", o, true));
+  else if (targets[0]) launchPrintPassPrnt("takeout", targets[0], true);
 }
 
 // カード内の印刷まわり（失敗警告／店内の大きな印刷ボタン／再印刷ボタン）
@@ -599,6 +627,7 @@ function startListeners() {
     knownPending = pendingIds;
     started = true;
     render();
+    maybeAutoPrintTakeout(); // 翌日以降の受け取りは、確定を待たず入った時点で伝票を出す
   });
   onSnapshot(collection(db, "dineInOrders"), snap => {
     dineinOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1022,7 +1051,9 @@ function bindCardButtons() {
         await takeSlot(o, newDate, upd.confirmedPickup);
       }
     }
-    // 確定した瞬間に伝票を印刷する（テイクアウト・冷凍共通、初回のみ。伝票には確定時刻を使う）
+    // 確定した瞬間に伝票を印刷する（当日受け取り分と、到着時印刷が未実施だった場合の再試行。
+    // 翌日以降の受け取りは到着時に印刷済みのことが多く、その場合は printedAt ガードで再印刷しない。
+    // 伝票には確定時刻を使う）
     if (!o.printedAt) {
       const confirmedOrder = { ...o, ...upd, pickupDate: upd.pickupDate || o.pickupDate };
       launchPrint("takeout", confirmedOrder, true);
