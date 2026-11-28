@@ -77,7 +77,7 @@ let stopUnsub = null;
 // 二重印刷・ループ防止の要（PassPRNT は戻りURLでこのページが再読み込みされるため特に重要）。
 // CloudPRNT の受け口は http（プリンターが https ではこの宛先に接続できないため実機確認のうえ http）。
 const PRINTER_PORT = "TCP:192.168.11.40";
-const CLOUDPRNT_BASE_URL = "http://ruberie-cloudprnt.lebelierora.workers.dev/p/_-KzOkgw2j4sD61KOxNDN1AyJ2sLWAFh3qb7k318";
+const CLOUDPRNT_BASE_URL = "https://ruberie-cloudprnt.lebelierora.workers.dev/p/_-KzOkgw2j4sD61KOxNDN1AyJ2sLWAFh3qb7k318";
 const PRINT_ROUTE_KEY = "printRoute"; // localStorage: "cloud" | "pass"（既定は "cloud"）
 function printRoute() {
   try { return localStorage.getItem(PRINT_ROUTE_KEY) === "pass" ? "pass" : "cloud"; }
