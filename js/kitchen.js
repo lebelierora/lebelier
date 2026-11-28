@@ -179,7 +179,13 @@ function buildTicketHtml(kind, o) {
 // 拡大・強調は必ず行の中で開始・解除を完結させ（行頭で開始し改行前に両方解除）、
 // 伝票の末尾は通常サイズに戻してから空行を付ける（次の伝票への拡大漏れ防止）。
 const TICKET_ESC = "\x1B";
-const TICKET_SIZE_PARAM = { wide: [1, 0], big: [1, 1], tall: [0, 1] }; // ESC i の [横, 縦]（倍率-1）
+// ESC i のパラメータ順は StarPRNT 公式仕様で [n1=縦, n2=横]（倍率-1）。
+// v120 では [横, 縦] と取り違えていたため、"tall" の [0, 1] は実際は横2倍になり、
+// 受け取り日時（sub・約35単位）が実効24単位でプリンター側に折り返されていた（2026-11-28 実機確認）。
+// "wide" の [1, 0] は実効では縦2倍・横等倍で、その見た目を本人が承認済みのため変えない。
+// "tall" は本来の意図どおり縦2倍・横等倍になる [1, 0] に直した（wide と同じバイト列だが、
+// 横は等倍なので幅予算は48で扱う）。
+const TICKET_SIZE_PARAM = { wide: [1, 0], big: [1, 1], tall: [1, 0] }; // ESC i の [縦, 横]（倍率-1）
 const TICKET_SIZE_BUDGET = { normal: 48, wide: 24, big: 24, tall: 48 }; // 印字幅の予算（SJIS幅: 全角2・半角1）
 
 // 伝票の1論理行: { t: 本文, size: normal|wide|big|tall, bold, center }
@@ -259,7 +265,7 @@ function buildTicketText(kind, o) {
   ];
   if (kind === "dinein") {
     specs.push(tline(`注文番号 ${orderCodeFromId(o.id)}`, "big", true));
-    if (!dineinTime.startsWith("9999")) specs.push(tline(`注文時刻 ${dineinTime.slice(11)}`));
+    if (!dineinTime.startsWith("9999")) specs.push(tline(`注文時刻 ${dineinTime.slice(11)}`, "wide", true));
   } else {
     specs.push(tline(`${o.name || ""} 様`, "wide", true), tline(`注文番号 ${orderCodeFromId(o.id)}`, "big", true));
   }
