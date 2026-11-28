@@ -1400,17 +1400,30 @@ async function submitDinein() {
                cut: c.cut, pack: null, choice: c.choice || null, toppings: c.toppings || [], timing: c.timing || null };
     });
     const orderNo = makeDineinNo();
-    const ref = await addDoc(collection(db, "dineInOrders"), {
-      orderNo, seat, seatLabel: seatLabel(seat),
-      items, total: cartTotal(), totalQty: cartQty(),
-      status: "pending",
-      createdAt: serverTimestamp(),
-    });
+    // テイクアウト・冷凍と同じ固まり対策（v135で横展開）: 決まったドキュメントへ setDoc し、
+    // タイムアウトで必ず復帰させる。再送しても同じドキュメントなので二重注文にならない。
+    const ref = doc(collection(db, "dineInOrders"));
+    let landed = false;
+    try {
+      await withTimeout(setDoc(ref, {
+        orderNo, seat, seatLabel: seatLabel(seat),
+        items, total: cartTotal(), totalQty: cartQty(),
+        status: "pending",
+        createdAt: serverTimestamp(),
+      }), SUBMIT_WRITE_TIMEOUT_MS);
+      landed = true;
+    } catch (e) {
+      // タイムアウトしても注文自体は届いていることがある。その場合は成功として扱う
+      if (e && e.code === "submit-timeout" && await orderLanded(getDoc, ref)) landed = true;
+      else throw e;
+    }
+    if (!landed) throw new Error("dinein-submit-failed");
     cart.length = 0; updateCartbar(false);
     showDineinDone(ref.id, orderNo);
   } catch (e) {
     console.error(e);
-    err("送信に失敗しました。通信環境をご確認のうえ、もう一度お試しください。");
+    if (e && e.code === "submit-timeout") err("通信に時間がかかりました。お手数ですが、もう一度送信してください（同じ内容の再送信では二重に注文されません）。");
+    else err("送信に失敗しました。通信環境をご確認のうえ、もう一度お試しください。");
   } finally {
     btn.disabled = false; btn.textContent = "この内容で注文する";
   }
@@ -1473,12 +1486,13 @@ async function callStaff(msgEl, purpose, custom) {
   if (callBusy) return;
   callBusy = true;
   try {
-    await addDoc(collection(db, "calls"), {
+    // 送信と同じ固まり対策: タイムアウトで必ず settle させ、下の callBusy 解除まで到達させる
+    await withTimeout(addDoc(collection(db, "calls"), {
       seat, seatLabel: seatLabel(seat), status: "open",
       purpose: purpose || "通常の呼び出し",
       ...(custom ? { custom: true } : {}),
       createdAt: serverTimestamp(),
-    });
+    }), SUBMIT_CHECK_TIMEOUT_MS);
     msgEl.textContent = "店員をお呼びしました。お席まで伺います。";
     toast("店員をお呼びしました。お席まで伺います", 3500);
   } catch (e) {
