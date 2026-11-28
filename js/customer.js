@@ -1,7 +1,7 @@
 // お客さん側ロジック：日時選択 → メニュー表示 → カスタマイズ → カート → 送信 → ライブ状況
 import { db } from "./firebase-config.js?v=20251126-84";
 import {
-  collection, addDoc, doc, getDoc, onSnapshot, runTransaction, serverTimestamp,
+  collection, addDoc, doc, getDoc, setDoc, onSnapshot, runTransaction, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   CATEGORIES, MENU, CUT_PACK_CATS, MAX_QTY, menuById, unitPrice, itemsForCategory,
@@ -958,6 +958,43 @@ function guideToSealChoice() {
   clearTimeout(sealGuideTimer);
   sealGuideTimer = setTimeout(() => { if (field) field.classList.remove("attention"); }, 2400);
 }
+// ==== SUBMIT-GUARD-LOGIC-BEGIN ====
+// 送信の固まり対策（2026-11-28 実機で発生）: Firestore のトランザクションは、通信が途中で
+// 固まると「解決も拒否もされない」ままになることがあり、ボタンが「送信中…」から戻らなくなる。
+// ここでは (1) タイムアウトで必ず失敗として画面を復帰させる、(2) 再送時は同じ注文番号・
+// 同じドキュメントを使い回し、自分の前回分で取れた枠は「埋まり」とみなさないことで、
+// タイムアウト後の再送が二重注文にならないようにする。
+const SUBMIT_WRITE_TIMEOUT_MS = 25000;  // 注文の書き込み（トランザクション／setDoc）の上限
+const SUBMIT_CHECK_TIMEOUT_MS = 15000;  // 送信前の読み取り（ブロック確認）の上限
+function withTimeout(promise, ms) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => {
+      const e = new Error("submit-timeout");
+      e.code = "submit-timeout";
+      reject(e);
+    }, ms);
+    promise.then(v => { clearTimeout(t); resolve(v); },
+                 e => { clearTimeout(t); reject(e); });
+  });
+}
+// 送信内容の同一判定キー（モード・日時・氏名・電話・備考・シール・カート明細）
+function submitKeyFor(o) {
+  return JSON.stringify([o.mode, o.date, o.time, o.name, o.phone, o.note, o.seal || "", o.sig]);
+}
+// その時刻の枠が「他人の注文」で埋まっているか（自分の注文番号なら埋まり扱いしない）
+function slotTakenByOther(taken, time, orderNo) {
+  return !!(taken && taken[time] && taken[time] !== orderNo);
+}
+// タイムアウト後に、注文ドキュメントが実際には届いていたかを確認する
+async function orderLanded(getDocFn, ref, ms = 8000) {
+  try {
+    const s = await withTimeout(getDocFn(ref), ms);
+    return s.exists();
+  } catch (e) { return false; }
+}
+// ==== SUBMIT-GUARD-LOGIC-END ====
+let pendingSubmit = null; // { key, ref, orderNo } 送信試行中の注文（再送時の使い回し用）
+
 async function submitOrder() {
   const name = $("cust-name").value.trim();
   const phone = normalizePhone($("cust-phone").value);
@@ -984,8 +1021,8 @@ async function submitOrder() {
   btn.disabled = true; btn.textContent = "送信中…";
   submitting = true;
   try {
-    // ブロック済み番号チェック
-    const blockedSnap = await getDoc(doc(db, "blockedPhones", phone));
+    // ブロック済み番号チェック（固まり対策のタイムアウト付き）
+    const blockedSnap = await withTimeout(getDoc(doc(db, "blockedPhones", phone)), SUBMIT_CHECK_TIMEOUT_MS);
     if (blockedSnap.exists()) {
       btn.disabled = false; btn.textContent = "この内容で注文を送信する";
       return errHtml(`この番号でのご注文はお受けできません。お電話でご注文ください（<a href="tel:0276702321">0276-70-2321</a>）`);
@@ -996,7 +1033,17 @@ async function submitOrder() {
       return { itemId: c.itemId, name: it.name, qty: c.qty, unitPrice: up, lineTotal: up * c.qty,
                cut: c.cut, pack: c.pack, choice: c.choice || null, toppings: c.toppings || [] };
     });
-    const orderNo = makeOrderNo();
+    // 再送時の二重注文防止：同じ内容の送信では、同じ注文ドキュメント・同じ注文番号を使い回す
+    const cartSig = cart.map(c => [c.itemId, c.qty, c.cut || "", c.pack || "", c.choice || "", (c.toppings || []).join("+")].join(":")).join("|") + "#" + cartTotal();
+    const submitKey = submitKeyFor({ mode, date: selDate, time: selTime, name, phone, note, seal: sealChoice, sig: cartSig });
+    let orderRef, orderNo;
+    if (pendingSubmit && pendingSubmit.key === submitKey) {
+      orderRef = pendingSubmit.ref; orderNo = pendingSubmit.orderNo;
+    } else {
+      orderRef = doc(collection(db, "takeoutOrders"));
+      orderNo = makeOrderNo();
+      pendingSubmit = { key: submitKey, ref: orderRef, orderNo };
+    }
     const orderData = {
       orderNo, name, phone, note,
       kind: mode === "frozen" ? "frozen" : "takeout",
@@ -1007,25 +1054,48 @@ async function submitOrder() {
       confirmedPickup: null, confirmedDate: null, status: "pending",
       createdAt: serverTimestamp(),
     };
-    let ref;
+    // 送信の後処理（成功時）。タイムアウト後に「実は届いていた」場合もここへ合流する
+    const finishOk = (ref) => {
+      pendingSubmit = null;
+      // この端末の注文として記録（注文状況の確認はこの端末の記録から行う）
+      try {
+        const mine = JSON.parse(localStorage.getItem("ruberie_my_orders") || "[]");
+        mine.push({ id: ref.id, orderNo, pickupDate: selDate, requestedDate: selDate });
+        localStorage.setItem("ruberie_my_orders", JSON.stringify(mine.slice(-12)));
+      } catch (e) { /* 保存できなくても注文は完了させる */ }
+      localStorage.setItem("ruberie_name", name);
+      localStorage.setItem("ruberie_phone", phone);
+      cart.length = 0; updateCartbar(false);
+      unwatchSlots();
+      showDone(ref.id, orderNo);
+    };
+    let ref = null;
     if (mode === "frozen") {
-      // 冷凍予約は枠を占有しない
-      ref = await addDoc(collection(db, "takeoutOrders"), orderData);
+      // 冷凍予約は枠を占有しない。addDoc でなく決まったドキュメントへ setDoc することで、再送しても二重にならない
+      try {
+        await withTimeout(setDoc(orderRef, orderData), SUBMIT_WRITE_TIMEOUT_MS);
+        ref = orderRef;
+      } catch (e) {
+        // タイムアウトしても注文自体は届いていることがある。その場合は成功として扱う
+        if (e && e.code === "submit-timeout" && await orderLanded(getDoc, orderRef)) ref = orderRef;
+        else throw e;
+      }
     } else {
       // 焼きピザは「1枠1注文」：枠の日次サマリ（daySlots）と注文を同じトランザクションで確定する
-      const orderRef = doc(collection(db, "takeoutOrders"));
       const slotRef = doc(db, "daySlots", selDate);
       try {
-        await runTransaction(db, async (tx) => {
+        await withTimeout(runTransaction(db, async (tx) => {
           const s = await tx.get(slotRef);
           const sdata = s.exists() ? s.data() : {};
           // 厨房が本日の受付を止めた直後に送信された当日注文は、ここで確実に弾く（この分岐はテイクアウトのみ）
           if (selDate === todayKey() && sdata.takeoutStopped) throw new Error("today-stopped");
           const taken = sdata.taken || {};
-          if (taken[selTime]) throw new Error("slot-taken");
+          // 自分の前回の送信で枠を取っていた場合は「埋まり」扱いしない（タイムアウト後の再送を成立させる）
+          if (slotTakenByOther(taken, selTime, orderNo)) throw new Error("slot-taken");
           tx.set(slotRef, { taken: { ...taken, [selTime]: orderNo } });
           tx.set(orderRef, orderData);
-        });
+        }), SUBMIT_WRITE_TIMEOUT_MS);
+        ref = orderRef;
       } catch (e) {
         if (e && e.message === "today-stopped") {
           btn.disabled = false; btn.textContent = "この内容で注文を送信する";
@@ -1041,24 +1111,16 @@ async function submitOrder() {
           startPickupFlow("checkout");
           return;
         }
-        throw e;
+        // タイムアウトしても注文自体は届いていることがある。その場合は成功として扱う
+        if (e && e.code === "submit-timeout" && await orderLanded(getDoc, orderRef)) ref = orderRef;
+        else throw e;
       }
-      ref = orderRef;
     }
-    // この端末の注文として記録（注文状況の確認はこの端末の記録から行う）
-    try {
-      const mine = JSON.parse(localStorage.getItem("ruberie_my_orders") || "[]");
-      mine.push({ id: ref.id, orderNo, pickupDate: selDate, requestedDate: selDate });
-      localStorage.setItem("ruberie_my_orders", JSON.stringify(mine.slice(-12)));
-    } catch (e) { /* 保存できなくても注文は完了させる */ }
-    localStorage.setItem("ruberie_name", name);
-    localStorage.setItem("ruberie_phone", phone);
-    cart.length = 0; updateCartbar(false);
-    unwatchSlots();
-    showDone(ref.id, orderNo);
+    finishOk(ref);
   } catch (e) {
     console.error(e);
-    err("送信に失敗しました。通信環境をご確認のうえ、もう一度お試しください。");
+    if (e && e.code === "submit-timeout") err("通信に時間がかかりました。お手数ですが、もう一度送信してください（同じ内容の再送信では二重に注文されません）。");
+    else err("送信に失敗しました。通信環境をご確認のうえ、もう一度お試しください。");
   } finally {
     submitting = false;
     btn.disabled = false; btn.textContent = "この内容で注文を送信する";
