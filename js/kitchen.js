@@ -68,13 +68,21 @@ let todayTakeoutStopped = false;
 let stopDateKey = null; // 停止フラグを購読中の日付キー（日付が変わったら張り替える）
 let stopUnsub = null;
 
-// ---------- 伝票印刷（PassPRNT） ----------
-// プリンター：スター精密 mC-Print3（TCP:192.168.11.40／80mm = size 576）。印刷は PassPRNT アプリ経由
-// （print-test.html の④ボタンと同じ方式・同じパラメータで実機確認済み）。
+// ---------- 伝票印刷 ----------
+// プリンター：スター精密 mC-Print3（TCP:192.168.11.40／80mm）。
+// 経路は2つ：CloudPRNT（Worker 経由・画面切り替えなし）が本経路、PassPRNT（アプリ経由）が予備経路。
+// localStorage の printRoute（"cloud" | "pass"、既定 "cloud"）で切り替え、厨房画面のトグルでも変更できる。
 // タイミング（本人の決定）：店内注文は注文が入った瞬間、テイクアウト・冷凍は厨房で確定した瞬間。呼び出しは印刷しない。
-// PassPRNT へ切り替わると戻りURLでこのページが再読み込みされるため、印刷済みフラグ（printedAt）を
-// 起動前に Firestore へ記録しておくことが二重印刷・ループ防止の要。
+// どちらの経路でも、印刷済みフラグ（printedAt）を出す前に Firestore へ記録しておくことが
+// 二重印刷・ループ防止の要（PassPRNT は戻りURLでこのページが再読み込みされるため特に重要）。
+// CloudPRNT の受け口は http（プリンターが https ではこの宛先に接続できないため実機確認のうえ http）。
 const PRINTER_PORT = "TCP:192.168.11.40";
+const CLOUDPRNT_BASE_URL = "http://ruberie-cloudprnt.lebelierora.workers.dev/p/_-KzOkgw2j4sD61KOxNDN1AyJ2sLWAFh3qb7k318";
+const PRINT_ROUTE_KEY = "printRoute"; // localStorage: "cloud" | "pass"（既定は "cloud"）
+function printRoute() {
+  try { return localStorage.getItem(PRINT_ROUTE_KEY) === "pass" ? "pass" : "cloud"; }
+  catch (e) { return "cloud"; }
+}
 const autoPrintAttempted = new Set(); // このページ表示中に自動印刷を試みた注文（メモリ上のループ防止）
 let printReturn = null;               // PassPRNT からの戻り情報 {code, message, kind, id}
 let printMsg = "";
@@ -118,6 +126,7 @@ async function handlePrintReturn() {
   }
 }
 
+// ==== PRINT-TICKET-BEGIN ====
 // 伝票（PassPRNT用HTML・80mm）。項目・選択肢の並べ方は厨房カードの itemsHtml と同じルール。
 function ticketItemsHtml(o) {
   return (o.items || []).map(i => {
@@ -163,8 +172,107 @@ function buildTicketHtml(kind, o) {
     '</body></html>';
 }
 
-// PassPRNT を起動して伝票を出す。isAuto=true の自動印刷は「printedAt 未記録」の注文に1回だけ。
-async function launchPrint(kind, o, isAuto) {
+// 伝票（CloudPRNT用プレーンテキスト・80mm）。内容・並びは buildTicketHtml と同じ。
+// HTML の文字サイズの強弱は再現できないため、区切り線と空行で代替する。
+// 長い商品名はプリンター側の折り返しに任せる。
+function ticketItemsText(o) {
+  return (o.items || []).map(i => {
+    const custom = [i.cut ? (i.cut === "cut4" ? "4カット" : i.cut === "cut6" ? "6カット" : "未カット") : null,
+                    i.pack ? (i.pack === "box" ? "箱" : "紙皿・ホイル") : null,
+                    i.choice || null,
+                    ...(i.toppings || [])].filter(Boolean).join("／");
+    const lines = [`${i.name} × ${i.qty}`];
+    if (custom) lines.push(`　${custom}`);
+    // HTML 版と同じく、伝票では提供タイミングを既定でも常時表示し、旧文言「できた順」は「でき次第」に読み替える
+    if (i.timing) lines.push(`　提供：${i.timing === "できた順" ? "でき次第" : i.timing}`);
+    return lines.join("\n");
+  }).join("\n");
+}
+function buildTicketText(kind, o) {
+  let head, sub;
+  if (kind === "dinein") {
+    head = "店内注文";
+    sub = o.seatLabel || seatLabel(o.seat);
+  } else if (o.kind === "frozen") {
+    head = "冷凍";
+    sub = `受け取り ${formatDateJP(o.confirmedDate || o.pickupDate)} ${o.confirmedPickup || o.requestedPickup || ""}`;
+  } else {
+    head = "テイクアウト";
+    sub = `受け取り ${formatDateJP(o.pickupDate)} ${o.confirmedPickup || o.requestedPickup || ""}`;
+  }
+  const dineinTime = tsSortKey(o.createdAt);
+  const lines = ["るべりえ", head, sub, "--------------------------------"];
+  if (kind === "dinein") {
+    lines.push(`注文番号 ${orderCodeFromId(o.id)}`);
+    if (!dineinTime.startsWith("9999")) lines.push(`注文時刻 ${dineinTime.slice(11)}`);
+  } else {
+    lines.push(`${o.name || ""} 様`, `注文番号 ${orderCodeFromId(o.id)}`);
+  }
+  lines.push("--------------------------------", ticketItemsText(o));
+  if (o.setMeal) lines.push("平日セット対象：揚げ物をサービスで付ける");
+  if (o.note) lines.push(`備考：${o.note}`);
+  if (o.kind === "frozen" && o.seal) {
+    lines.push(`温め方シール：${o.seal === "none" ? "不要（貼らない）" : "必要（各商品に貼る）"}`);
+  }
+  lines.push("--------------------------------", `合計 ${yen(o.total)}`, "", "");
+  return lines.join("\n").replace(/\r/g, "");
+}
+// ==== PRINT-TICKET-END ====
+
+// ==== SJIS-LOGIC-BEGIN ====
+// Shift_JIS エンコード（CloudPRNT の textB64 用）。外部ライブラリは使わず、
+// TextDecoder('shift_jis') で全バイト列を復号して「文字→バイト列」の逆引き表を初回だけ作る。
+// SJIS に無い文字は "?"（0x3F）にする。
+let sjisMapCache = null;
+function buildSjisMap() {
+  const map = new Map();
+  const dec = new TextDecoder("shift_jis");
+  // 1バイト文字（ASCII・半角カナ）。リードバイト単独は復号エラー（U+FFFD）になるので自然に除かれる
+  for (let b = 0x00; b <= 0xFF; b++) {
+    const s = dec.decode(new Uint8Array([b]));
+    if (s.length === 1 && s !== "�" && !map.has(s)) map.set(s, [b]);
+  }
+  // 2バイト文字
+  const leads = [];
+  for (let b = 0x81; b <= 0x9F; b++) leads.push(b);
+  for (let b = 0xE0; b <= 0xFC; b++) leads.push(b);
+  for (const lead of leads) {
+    for (let t = 0x40; t <= 0xFC; t++) {
+      if (t === 0x7F) continue;
+      const s = dec.decode(new Uint8Array([lead, t]));
+      if (s.length === 1 && s !== "�" && !map.has(s)) map.set(s, [lead, t]);
+    }
+  }
+  // 復号側の割当ての都合で逆引きに現れないが、SJIS では同じバイトになる文字の補完
+  if (!map.has("\\")) map.set("\\", [0x5C]);
+  if (!map.has("~")) map.set("~", [0x7E]);
+  map.set("¥", [0x5C]);        // U+00A5（円記号）。プリンターでは 0x5C が ¥ として印字される
+  map.set("〜", [0x81, 0x60]); // U+301C（波ダッシュ）
+  return map;
+}
+function encodeSjisBytes(str) {
+  if (!sjisMapCache) sjisMapCache = buildSjisMap();
+  const out = [];
+  for (const ch of String(str)) {
+    const bytes = sjisMapCache.get(ch);
+    if (bytes) out.push(bytes[0], ...(bytes[1] !== undefined ? [bytes[1]] : []));
+    else out.push(0x3F); // "?"
+  }
+  return new Uint8Array(out);
+}
+function encodeSjisBase64(str) {
+  const bytes = encodeSjisBytes(str);
+  let bin = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
+}
+// ==== SJIS-LOGIC-END ====
+
+// PassPRNT を起動して伝票を出す（予備経路）。isAuto=true の自動印刷は「printedAt 未記録」の注文に1回だけ。
+async function launchPrintPassPrnt(kind, o, isAuto) {
   const coll = kind === "dinein" ? "dineInOrders" : "takeoutOrders";
   const skey = `passprnt-launched:${kind}:${o.id}`;
   if (isAuto) {
@@ -192,13 +300,126 @@ async function launchPrint(kind, o, isAuto) {
   return true;
 }
 
-// 店内注文の自動印刷：未印刷の確認待ちがあれば、来た順に1件だけ試みる
-// （PassPRNTから戻るたびにページが再読み込みされ、次の1件が対象になる）
+// ==== CLOUD-LOGIC-BEGIN ====
+// CloudPRNT の状態確認の判定（純粋関数）。
+// queued の間は、紙切れ・カバー開き等でプリンターが復旧後に同じジョブを自動で出すため、
+// 絶対に failed にしない（先に failed にして再印刷すると二重印刷になる）。
+// failed になるのは、プリンター側のエラーコードで完了した場合と、ジョブの有効期限
+// （Worker 側10分）を過ぎて配布されなくなった場合だけ。
+function cloudJobOutcome(st, elapsedMs) {
+  if (st && st.state === "done") return st.ok ? "printed" : "failed";
+  if (st && st.state === "expired") return "failed";
+  if (elapsedMs > 11 * 60 * 1000) return "failed"; // 結果を確認できないまま保持期間を過ぎたら打ち切る
+  return "wait";
+}
+// ==== CLOUD-LOGIC-END ====
+
+const cloudWatchers = new Map(); // docId -> true（状態確認ポーリングの重複防止）
+
+// CloudPRNT の印刷結果を約3秒間隔で追跡し、printStatus を確定させる。
+// ページを開き直した場合は render() から再開される（cloudJobId が注文に残っているため）。
+function watchCloudJob(kind, id, jobId) {
+  if (cloudWatchers.has(id)) return;
+  cloudWatchers.set(id, true);
+  const coll = kind === "dinein" ? "dineInOrders" : "takeoutOrders";
+  const startedAt = Date.now();
+  const timer = setInterval(async () => {
+    let st = null;
+    try {
+      const res = await fetch(`${CLOUDPRNT_BASE_URL}/status?job=${encodeURIComponent(jobId)}`);
+      if (res.ok) st = await res.json();
+    } catch (e) { /* 一時的な通信失敗は次の回に任せる */ }
+    const outcome = cloudJobOutcome(st, Date.now() - startedAt);
+    if (outcome === "wait") return;
+    clearInterval(timer);
+    cloudWatchers.delete(id);
+    if (outcome === "printed") {
+      await updateDoc(doc(db, coll, id), { printStatus: "printed" }).catch(() => {});
+      printMsgOk = true;
+      printMsg = "🖨 伝票を印刷しました";
+    } else {
+      await updateDoc(doc(db, coll, id), { printStatus: "failed" }).catch(() => {});
+      printMsgOk = false;
+      printMsg = "⚠ 伝票の印刷に失敗しました。注文カードの「伝票を再印刷」ボタンで出し直せます。";
+    }
+    showPrintMsg();
+    maybeAutoPrintDinein(); // 店内注文の自動印刷の取りこぼし防止（ガード済みなので安全）
+  }, 3000);
+}
+
+// CloudPRNT へ伝票ジョブを投入する（本経路）。ガード構造は PassPRNT 版と同じ
+// （printedAt の先行記録・autoPrintAttempted・sessionStorage）。
+// jobId は注文IDと印刷回数から決定的に作り、再送・二重タップでも同じジョブとして扱う。
+async function launchPrintCloud(kind, o, isAuto) {
+  const coll = kind === "dinein" ? "dineInOrders" : "takeoutOrders";
+  const skey = `cloudprnt-launched:${kind}:${o.id}`;
+  if (isAuto) {
+    if (o.printedAt || autoPrintAttempted.has(o.id)) return false;
+    try { if (sessionStorage.getItem(skey)) return false; } catch (e) {}
+  }
+  autoPrintAttempted.add(o.id);
+  try { sessionStorage.setItem(skey, "1"); } catch (e) {}
+  const jobId = `${kind}-${o.id}-${(o.printCount || 0) + 1}`;
+  try {
+    // PassPRNT 版と同じく「出す前に」フラグを記録する。cloudJobId も一緒に残し、
+    // ページを開き直しても状態確認を再開できるようにする。
+    await updateDoc(doc(db, coll, o.id), {
+      printedAt: serverTimestamp(), printStatus: "sent",
+      printCount: (o.printCount || 0) + 1, cloudJobId: jobId,
+    });
+  } catch (e) {
+    console.error("印刷フラグの記録に失敗", e);
+    if (isAuto) return false; // フラグが書けないまま出すとループしかねないので自動は中止（手動ボタンで出せる）
+  }
+  let submitted = false;
+  try {
+    const res = await fetch(CLOUDPRNT_BASE_URL + "/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jobId, textB64: encodeSjisBase64(buildTicketText(kind, o)) }),
+    });
+    if (!res.ok) throw new Error("submit failed: " + res.status);
+    submitted = true;
+  } catch (e) {
+    console.error("CloudPRNT へのジョブ投入に失敗", e);
+    // 応答が途中で切れただけで Worker には届いている可能性があるため、状態確認で
+    // キューに入っている（または完了済み）ことが分かれば投入できたものとして扱う。
+    // 入っていないことが確かめられた場合だけ失敗にする（二重印刷防止のため、
+    // PassPRNT への自動フォールバックはしない。再印刷は手動ボタンから行う）。
+    try {
+      const res = await fetch(`${CLOUDPRNT_BASE_URL}/status?job=${encodeURIComponent(jobId)}`);
+      if (res.ok) {
+        const st = await res.json();
+        if (st.state === "queued" || st.state === "done") submitted = true;
+      }
+    } catch (e2) { /* 状態確認も届かない場合は失敗として扱う */ }
+  }
+  if (!submitted) {
+    await updateDoc(doc(db, coll, o.id), { printStatus: "failed" }).catch(() => {});
+    printMsgOk = false;
+    printMsg = "⚠ 伝票データを送れませんでした。注文カードの「伝票を再印刷」ボタンで出し直せます。";
+    showPrintMsg();
+    return false;
+  }
+  watchCloudJob(kind, o.id, jobId);
+  return true;
+}
+
+// 印刷の発火点はすべてこのディスパッチャを通す（経路は printRoute() で切り替え）。
+function launchPrint(kind, o, isAuto) {
+  return printRoute() === "cloud" ? launchPrintCloud(kind, o, isAuto)
+                                  : launchPrintPassPrnt(kind, o, isAuto);
+}
+
+// 店内注文の自動印刷：未印刷の確認待ちを来た順に試みる。
+// CloudPRNT は画面遷移がないので全件まとめて投入し、Worker 側の FIFO に任せる。
+// PassPRNT は戻るたびにページが再読み込みされるため、先頭の1件だけを対象にする。
 function maybeAutoPrintDinein() {
-  const target = dineinOrders
+  const targets = dineinOrders
     .filter(o => o.status === "pending" && !o.printedAt)
-    .sort((a, b) => tsMillis(a.createdAt) - tsMillis(b.createdAt))[0];
-  if (target) launchPrint("dinein", target, true);
+    .sort((a, b) => tsMillis(a.createdAt) - tsMillis(b.createdAt));
+  if (printRoute() === "cloud") targets.forEach(o => launchPrintCloud("dinein", o, true));
+  else if (targets[0]) launchPrintPassPrnt("dinein", targets[0], true);
 }
 
 // カード内の印刷まわり（失敗警告／店内の大きな印刷ボタン／再印刷ボタン）
@@ -287,6 +508,21 @@ async function setTakeoutStopped(stop) {
   }
 }
 $("stop-btn").addEventListener("click", () => setTakeoutStopped(!todayTakeoutStopped));
+
+// ---------- 伝票印刷の経路切替（この端末の localStorage に保存） ----------
+function renderPrintRoute() {
+  const btn = $("print-route-btn");
+  const state = $("print-route-state");
+  if (!btn || !state) return;
+  const cloud = printRoute() === "cloud";
+  state.textContent = cloud ? "クラウド印刷（画面切り替えなし）" : "PassPRNT（アプリ経由）";
+  btn.textContent = cloud ? "PassPRNTに切り替える" : "クラウド印刷に切り替える";
+}
+$("print-route-btn").addEventListener("click", () => {
+  try { localStorage.setItem(PRINT_ROUTE_KEY, printRoute() === "cloud" ? "pass" : "cloud"); } catch (e) {}
+  renderPrintRoute();
+});
+renderPrintRoute();
 
 function startListeners() {
   // テスト段階では全件購読し、表示は「昨日以降の受け取り分」に絞る（件数は少ない前提）
@@ -468,6 +704,11 @@ function render() {
   bindDineinButtons();
   bindPrintButtons();
   renderStats();
+  // CloudPRNT の結果待ち（printStatus=sent）の注文は、ページを開き直しても追跡を再開する
+  if (printRoute() === "cloud") {
+    for (const o of dineinOrders) if (o.printStatus === "sent" && o.cloudJobId) watchCloudJob("dinein", o.id, o.cloudJobId);
+    for (const o of orders) if (o.printStatus === "sent" && o.cloudJobId) watchCloudJob("takeout", o.id, o.cloudJobId);
+  }
 }
 
 // ==== 注文集計（純粋計算） STATS-LOGIC-BEGIN ====

@@ -114,6 +114,11 @@
     <span class="stop-label">本日のテイクアウト受付：</span>
     <button class="btn ghost small" id="stop-btn" type="button">本日のテイクアウト受付を止める</button>
   </div>
+  <div class="stop-row">
+    <span class="stop-label">伝票印刷の経路：</span>
+    <span class="note" id="print-route-state" style="font-weight:900;">クラウド印刷（画面切り替えなし）</span>
+    <button class="btn ghost small" id="print-route-btn" type="button">PassPRNTに切り替える</button>
+  </div>
   <div class="stats-panel" id="stats-panel">
     <div class="stats-title">📊 注文集計</div>
     <div id="stats-body"><span class="note">集計中…</span></div>
@@ -166,6 +171,6 @@
 <audio id="order-sound" src="audio/moko-order-v2.mp3" preload="auto"></audio>
 <audio id="call-sound" src="audio/moko-call-v2.mp3" preload="auto"></audio>
 
-<script type="module" src="js/kitchen.js?v=20251127-117"></script>
+<script type="module" src="js/kitchen.js?v=20251128-118"></script>
 </body>
 </html>
